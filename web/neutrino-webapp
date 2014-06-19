@@ -1,0 +1,103 @@
+#!/opt/local/bin/perl
+use Mojolicious::Lite;
+use Mojolicious::Validator;
+use Mojolicious::Validator::Validation;
+use DateTime;
+use DBI;
+
+my $config  = plugin 'Config';
+my $appname = "Neutrino";
+my $version = "0.1";
+
+get "/" => sub {
+    my $self = shift;
+    $self->render_static("index.html");
+};
+
+get "/help-about.html" => {appname => $appname, version => $version} => sub {
+    my $self = shift;
+} => 'about';
+
+##########
+## API ###
+##########
+
+under '/api';
+
+get "/date" => sub {
+    my $self = shift;
+    my $date;
+    $self->render(json => $date);
+};
+
+get "/config/zipcode" => sub {
+    my $self = shift;
+    my $dbh = _mysql_dbh($self, $config) or return;
+    my $sth = $dbh->prepare("SELECT value from configuration where name='zipcode'");
+    $sth->execute();
+    my $row = $sth->fetchrow_hashref();
+    if (exists $row->{value}) {
+        $self->render(json => $row);
+    } else {
+        $self->render(text => "no config found", status => 404);
+    }
+    $sth->finish();
+};
+
+post "/config/zipcode" => sub {
+    my $self  = shift;
+    my $zipcode = $self->param('zipcode');
+    my $validator = Mojolicious::Validator->new;
+    my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
+
+    $validation->input({'zipcode' => $zipcode});
+    $validation->required('zipcode')->like(qr/^\d+$/);
+    if(! $validation->is_valid) {
+        $self->render(status => 400, text => "bad format for zipcode" );
+        return;
+    }
+
+    my $dbh = _mysql_dbh($self, $config) or return;
+    my $sth = $dbh->prepare("select id from configuration where name='zipcode'");
+    $sth->execute();
+    my $row = $sth->fetchrow_hashref();
+    if (exists $row->{id}) {
+        if(!$dbh->do("UPDATE configuration SET name=?, value=? WHERE id=?", undef, 'zipcode', $zipcode, $row->{id})) {
+            $self->render(status => 400, text => 'failed to save value to database');
+            return;
+        }
+    } else {
+        if(!$dbh->do("INSERT INTO configuration (name, value) VALUES (?, ?)", undef, 'zipcode', $zipcode)) {
+            $self->render(status => 400, text => 'failed to save value to database');
+            return;
+        }
+    }
+
+    $self->render(status => 200, text => 'ok');
+};
+
+
+app->start;
+
+
+##################
+### local subs ###
+##################
+
+sub _mysql_dbh {
+    my $self   = shift;
+    my $config = shift;
+    my $dbh    = DBI->connect("DBI:mysql:database=$config->{mysqldb}:host=$config->{mysqlserver}:port=3306",
+                           $config->{mysqluser},$config->{mysqlpass})
+                      or $self->render(status=>500,text=>'Failed database connection') and return 0;
+    return $dbh;
+}
+
+__DATA__
+
+@@ about.html.ep
+<div class="jumbotron">
+  <div class="container">
+    <%= $appname %> <%= $version %>
+  </div>
+</div>

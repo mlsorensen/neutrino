@@ -24,6 +24,13 @@ CREATE TABLE neutrino.data (
   CONSTRAINT `data_ibfk_1` FOREIGN KEY (`sensor_address`) REFERENCES `sensor` (`sensor_address`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
+CREATE TABLE neutrino.configuration (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) UNIQUE NOT NULL,
+  `value` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
 #creates user if not exist. Edit user info to your liking
 GRANT USAGE ON neutrino.* TO 'neutrino'@'%';
 DROP USER 'neutrino'@'%';
