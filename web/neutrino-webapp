@@ -37,7 +37,6 @@ get "/sensors" => sub {
     my $sth = $dbh->prepare("SELECT * from sensor");
     $sth->execute();
     my $data = $sth->fetchall_arrayref({});
-    print Dumper $data;
     $sth->finish();
     if (exists $data->[0]) {
         $self->render(status => 200, json => { result => 1, payload => $data});
@@ -73,8 +72,41 @@ get "/sensors/:id/data" => sub {
     if (exists $data->[0]) {
         $self->render(status => 200, json => { result => 1, payload => $data});
     } else {
-        $self->render(status => 500, json => { result => 0, payload => 'server error'});
+        $self->render(status => 500, json => { result => 0, payload => 'unable to find data'});
     }
+};
+
+post "/sensors/:id/name" => sub {
+    my $self       = shift;
+    my $id         = $self->param('id');
+    my $value      = $self->param('value');
+    my $validator  = Mojolicious::Validator->new;
+    my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
+
+    $validation->input({'id' => $id, 'value' => $value});
+    $validation->required('id')->like(qr/^\d+$/);
+    $validation->required('value')->like(qr/^[\s\w\d,\-\._\']+$/);;
+    if(! $validation->is_valid) {
+        $self->render(status => 406, json => { result => 0, text => "a parameter($id,$value) provided did not match character validation"} );
+        return;
+    }
+
+    my $dbh = _mysql_dbh($self, $config) or return;
+    $dbh->do("UPDATE sensor set display_name=? where sensor_address=?", undef, $value, $id);
+    if($dbh->errstr()) {
+        $self->render(status => 500, json => { result => 0, text => 'failed to save value to database'});
+    }
+    $self->render(status => 200, json => { result => 1, text => 'success' });
+};
+
+get "/config" => sub {
+    my $self = shift;
+    my $dbh = _mysql_dbh($self, $config) or return;
+    my $sth = $dbh->prepare("SELECT name,value from configuration");
+    $sth->execute();
+    my $data = $sth->fetchall_hashref('name');
+    $sth->finish();
+    $self->render(json => { result => 1, payload => $data});
 };
 
 get "/config/:key" => sub {
@@ -111,12 +143,14 @@ post "/config/:key" => sub {
     $sth->execute();
     my $row = $sth->fetchrow_hashref();
     if (exists $row->{id}) {
-        if(!$dbh->do("UPDATE configuration SET name=?, value=? WHERE id=?", undef, $key, $value, $row->{id})) {
+        $dbh->do("UPDATE configuration SET name=?, value=? WHERE id=?", undef, $key, $value, $row->{id});
+        if($dbh->errstr()) {
             $self->render(status => 500, json => { result => 0, text => 'failed to save value to database'});
             return;
         }
     } else {
-        if(!$dbh->do("INSERT INTO configuration (name, value) VALUES (?, ?)", undef, $key, $value)) {
+        $dbh->do("INSERT INTO configuration (name, value) VALUES (?, ?)", undef, $key, $value);
+        if($dbh->errstr()) {
             $self->render(status => 500, json => { result => 0, text => 'failed to save value to database'});
             return;
         }
