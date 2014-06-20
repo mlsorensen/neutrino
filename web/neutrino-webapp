@@ -69,10 +69,11 @@ get "/sensors/:id/data" => sub {
     $sth->execute();
     my $data = $sth->fetchall_arrayref({});
     $sth->finish();
-    if (exists $data->[0]) {
+    if (!$dbh->errstr()) {
         $self->render(status => 200, json => { result => 1, payload => $data});
     } else {
-        $self->render(status => 500, json => { result => 0, payload => 'unable to find data'});
+        print $dbh->errstr();
+        $self->render(status => 500, json => { result => 0, text => 'Database error occurred'});
     }
 };
 

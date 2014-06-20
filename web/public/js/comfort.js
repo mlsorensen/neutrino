@@ -71,11 +71,15 @@ function renderSensorGraph(sensor, value, hours, targetdiv) {
                 element[1] = data.payload[i].temperature;
                 graphdata[i] = element;
             }
-            var dataset = [{data :graphdata, label:sensor.html(), color: "#0062E3", lines:{show:true}, curvedLines: {apply:false}}];
-            var options = { series: {shadowSize:5, curvedLines:{active:true}}, xaxes:[{mode:"time"}], yaxis:{axisLabel:"Temperature"}};
+            var dataset = [{data :graphdata, label:sensor.html(), color: "#0062E3", lines:{show:false} }];
+            var options = { series: {shadowSize:5, lines:{show:false},splines:{show:true, tension:.1}}, xaxes:[{mode:"time"}], yaxis:{axisLabel:"Temperature"}};
             $.plot($("#sensor-graph"), dataset, options );
             $("#sensor-graph").css("background", "linear-gradient(to top, #ebebeb , white)");
+        } else {
+            $("#sensor-graph").notify("unexpected server response", "error");
         }
+    }).error(function(data) {
+        $("#sensor-graph").notify("server error" + $.parseJSON(data.responseText).text, "error");
     });
 }
 
@@ -93,7 +97,7 @@ function populateSensors() {
     $(".nav-stacked > .sensor > a").on("click", function(event) {
         $(".nav-stacked > .sensor").removeClass('active');
         $(this).parent().addClass('active');
-        renderSensorGraph($(this), "temperature", 12, $("#sensor-graph"));
+        renderSensorGraph($(this), "temperature", 6, $("#sensor-graph"));
         $("#sensor-name-input").val($(this).html());
     });
 
