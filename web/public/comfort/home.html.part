@@ -1,5 +1,8 @@
-<div class="jumbotron">
-  <div class="container">
-    Comfort, get some.
-  </div>
+<div id="comfort-home-div" class="col-md-5">
+    <table id="home-table" class="table">
+         <tr><td id="home-location-label">Location</td><td data-bind="text: locale" id="home-location-value"></td></tr>
+         <tr><td id="home-weather-label">Weather</td><td data-bind="text: home-weather-value" id="home-weather-value"></td></tr>
+         <tr><td id="home-temperature-label">Temperature</td><td data-bind="text: home-temperature-value" id="home-temperature-value"></td></tr>
+         <tr><td id="home-humidity-label">Humidity</td><td data-bind="text: home-humidity-value" id="home-humidity-value"></td></tr>
+    </table>
 </div>

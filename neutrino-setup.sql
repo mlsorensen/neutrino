@@ -35,4 +35,8 @@ CREATE TABLE neutrino.configuration (
 GRANT USAGE ON neutrino.* TO 'neutrino'@'%';
 DROP USER 'neutrino'@'%';
 GRANT ALL on neutrino.* to 'neutrino'@'%' IDENTIFIED BY 'electron14';
+
+GRANT USAGE ON neutrino.* TO 'neutrino'@'localhost';
+DROP USER 'neutrino'@'localhost';
+GRANT ALL on neutrino.* to 'neutrino'@'localhost' IDENTIFIED BY 'electron14';
 FLUSH PRIVILEGES;

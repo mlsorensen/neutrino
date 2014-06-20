@@ -1,0 +1,23 @@
+<form id="setup-form" class="navbar-form navbar-left col-md-8" role="setup">
+    <div class="form-group">
+        <div class="input-group col-md-4">
+            <span class="input-group-addon">location</span>
+            <input data-bind="value: locale" id="location" type="text" class="form-control" placeholder="city,state">
+        </div>
+        
+        <div class="input-group radio col-md-4">
+            Temperature Units
+            <label>
+                <input value="Fahrenheit" id="location" type="radio" class="form-control" id="setup-units-fahrenheit" name="setup-temperature-units" checked>Fahrenheit
+            </label>
+            <label>
+                <input value="Celsius" id="location" type="radio" class="form-control" id="setup-units-celsuis" name="setup-temperature-units">Celsius
+            </label>
+        </div>
+    </div>
+</form>
+<p>
+    <div class="col-md-3"></div>
+    <button id="submit-setup-form" type="button" class="btn btn-default col-md-1">Submit</button>
+</p>
+

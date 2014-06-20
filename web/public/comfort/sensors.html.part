@@ -1,5 +1,11 @@
-<div class="jumbotron">
-  <div class="container">
-    Sensors, get some.
-  </div>
+<div id='comfort-sensors-div'>
+    <div id='sensor-nav' class='navbar-left col-md-2'>
+        <table>
+            <tr><td>sensor1</td></tr>
+            <tr><td>sensor2</td></tr>
+        </table>
+    </div>
+    <div id='sensor-detail' class='col-md-10'>
+        <div id="sensor1-graph" style="width:600px;height:400px;background: linear-gradient(to top, #ebebeb , white)"></div>
+    </div>
 </div>
