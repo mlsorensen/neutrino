@@ -43,6 +43,18 @@ $(document).on('DOMNodeInserted', function(event) {
             populateSensors();
         }, 200);
     }
+
+    // sensorgroups
+    if (event.target.id == 'comfort-sensorgroups-div') {
+        //sensorgroup nav bar
+        var interval = setInterval(function() {
+            if (sensorgroups == undefined) {
+                return;
+            }
+            clearInterval(interval);
+            populateSensorGroups();
+        }, 200);
+    }
 });
 
 function renderVoltage(sensor) {
@@ -104,8 +116,6 @@ function renderSensorGraph(sensor, value, hours, targetdiv) {
     }
 }
 
-
-
 function populateSensors() {
     for (i = 0; i < sensors.length; i++) {
         var $row = "<li class='sensor'><a id='sensor" + sensors[i].sensor_address + "' href='#'>sensor " + sensors[i].sensor_address + "</a></li>";
@@ -115,6 +125,7 @@ function populateSensors() {
         $("#sensor-nav-list").append($row);
     }
 
+    // populate info on click
     $(".nav-stacked > .sensor > a").on("click", function(event) {
         $(".nav-stacked > .sensor").removeClass('active');
         $(this).parent().addClass('active');
@@ -128,7 +139,7 @@ function populateSensors() {
 
     // save sensor name edit
     $("#sensor-name-save").on("click", function(event) {
-        var sensorid = $(".active.sensor > a")[0].id.replace("sensor","")
+        var sensorid = $(".active.sensor > a")[0].id.replace("sensor ","")
         var newname = $("#sensor-name-input").val();
         $.post("/api/sensors/" + sensorid + "/name", {"value": newname}, function(data) {
             $("#sensor-name-save").notify(data.text, "info");
@@ -137,6 +148,86 @@ function populateSensors() {
         }).error(function(data) {
             $("#sensor-name-save").notify("error on saving name:" + $.parseJSON(data.responseText).text, "error");
         });
+    });
+}
+
+function populateSensorGroups() {
+    $("#sensorgroup-nav-list").html("");
+    var sensornavrow;
+    for (i = 0; i < sensorgroups.length; i++) {
+        sensornavrow = "<li class='sensorgroup'><a id='sensorgroup "+ sensorgroups[i].id + "' href='#'>" + sensorgroups[i].display_name + "</a></li>";
+        $("#sensorgroup-nav-list").append(sensornavrow);
+    }
+
+    // add + sign to sensorgroup nav
+    //$("#sensorgroup-nav-list").append("<li class='sensorgroup'><a id='addsensorgroup' href='#'></a></li>");
+    sensornavrow = "<li class=''><a id='addsensorgroup' class='glyphicon glyphicon-plus label-info'" + 
+                   " style='color:white;text-align:center' href='#'></a></li>";
+    $("#sensorgroup-nav-list").append(sensornavrow);
+
+    $("#addsensorgroup").on("click", function() {
+        $(".nav-stacked > .sensorgroup").removeClass('active');
+        $("#sensorgroup-sensorselect-dropdown").addClass('hidden');
+        $("#sensorgroup-name-input").val("");
+    });
+
+    // populate info on selected sensor group 
+    $(".nav-stacked > .sensorgroup > a").on("click", function(event) {
+        $(".nav-stacked > .sensorgroup").removeClass('active');
+        $(this).parent().addClass('active');
+        $("#sensorgroup-name-input").val($(this).html());
+
+        // populate sensor select dropdown
+        $("#sensorgroup-sensorselect-dropdown").removeClass('hidden');
+        $("#sensorgroup-sensorselect-list").html('');
+        for(i = 0; i < sensors.length; i++) {
+            //var li = '<li><a id=sensor "' + sensors[i].id + '" class="sensorgroup-sensorselect-item" href="#">' + sensors[i].display_name + '</a></li>';
+            var li = '<li><label class="checkbox"><input id="sensorgroup-sensor ' + sensors[i].id 
+                     + '" type="checkbox">' + sensors[i].display_name + '</label></li>';
+            $("#sensorgroup-sensorselect-list").append(li);
+        }
+
+        // keep menu open when clicking checkboxes
+        $('#sensorgroup-sensorselect-list').on('click', function(e) {
+            e.stopPropagation();
+        });
+
+        // save selections when focus lost
+        $('#sensorgroup-sensorselect-list').on('change', function(e) {
+            console.log("save sensors");
+        });
+    });
+
+    // save new sensor group or save name
+    $("#sensorgroup-name-save").on("click", function(event) {
+        var newname = $("#sensorgroup-name-input").val();
+        // add new if current context is new sensor vs updating name on existing
+        if ($(".active.sensorgroup").length != 0) {
+            console.log($(".active.sensorgroup"));
+            var sensorgroupid = $(".active.sensorgroup > a")[0].id.replace("sensorgroup ","");
+            var newname = $("#sensorgroup-name-input").val();
+            $.post("/api/sensorgroups/" + sensorid + "/name", {"value": newname}, function(data) {
+                $("#sensorgroup-name-save").notify(data.text, "info");
+                $(".active.sensorgroup > a").html(newname);
+                getSensorGroups();
+            }).error(function(data) {
+                $("#sensor-name-save").notify("error on saving name:" + $.parseJSON(data.responseText).text, "error");
+            });
+
+        } else {
+            $.ajax({url: "/api/sensorgroups",
+                    type: 'PUT',
+                    data: {"value": newname},
+                    success: function(data) {
+                        $("#sensorgroup-name-save").notify(data.text, "info");
+                        $(".active.sensorgroup > a").html(newname);
+                        getSensorGroups();
+                    },
+                    error: function(data) {
+                        $("#sensor-name-save").notify("error on saving newgroup" + $.parseJSON(data.responseText).text, "error");
+                    }
+            });
+        }
     });
 }
 

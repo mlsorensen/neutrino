@@ -61,11 +61,47 @@ get "/sensors" => sub {
     $sth->execute();
     my $data = $sth->fetchall_arrayref({});
     $sth->finish();
-    if (exists $data->[0]) {
+    if (!$dbh->errstr()) {
         $self->render(status => 200, json => { result => 1, payload => $data});
     } else {
-        $self->render(status => 500, json => { result => 0, payload => 'server error'});
+        $self->render(status => 500, json => { result => 0, payload => 'Database error occurred'});
     }
+};
+
+get "/sensorgroups" => sub {
+    my $self = shift;
+    my $dbh = _mysql_dbh($self, $config) or return;
+    my $sth = $dbh->prepare("SELECT * from sensorgroup");
+    $sth->execute();
+    my $data = $sth->fetchall_arrayref({});
+    $sth->finish();
+    if (!$dbh->errstr()) {
+        $self->render(status => 200, json => { result => 1, payload => $data});
+    } else {
+        $self->render(status => 500, json => { result => 0, payload => 'Database error occurred'});
+    }
+};
+
+put "/sensorgroups" => sub {
+    my $self  = shift;
+    my $name  = $self->param('value');
+    my $validator  = Mojolicious::Validator->new;
+    my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
+
+    $validation->input({'name' => $name});
+    $validation->required('name')->like(qr/^[\s\w\d,\-\._\']+$/);;
+    if(! $validation->is_valid) {
+        $self->render(status => 406, json => { result => 0, text => "name provided did not match character validation"} );
+        return;
+    }
+
+    my $dbh = _mysql_dbh($self, $config) or return;
+    $dbh->do("insert into sensorgroup (display_name) values (?)", undef, $name);
+    if($dbh->errstr()) {
+        $self->render(status => 500, json => { result => 0, text => 'failed to save values to database'});
+    }
+    $self->render(status => 200, json => { result => 1, text => 'success' });
+   
 };
 
 get "/sensors/:id/data" => sub {
@@ -109,7 +145,7 @@ post "/sensors/:id/name" => sub {
 
     $validation->input({'id' => $id, 'value' => $value});
     $validation->required('id')->like(qr/^\d+$/);
-    $validation->required('value')->like(qr/^[\s\w\d,\-\._\']+$/);;
+    $validation->required('value')->like(qr/^[\s\w\d,\-\._\']+$/);
     if(! $validation->is_valid) {
         $self->render(status => 406, json => { result => 0, text => "a parameter($id,$value) provided did not match character validation"} );
         return;

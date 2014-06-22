@@ -23,6 +23,7 @@ $(document).ready(function(){
     
     getConfig();
     getSensors();
+    getSensorGroups();
 
     // weather is dependent on location
     var interval = setInterval(function() {
@@ -39,9 +40,11 @@ function getConfig() {
         if(data.result) {
             config = data.payload;
         } else {
-            //alert server error
+            $(".navbar-brand").notify(data.text, "error");
         }
-    });
+    }).error(function(data) {
+        $(".navbar-brand").notify("failed to fetch config from api","error");
+    })
 }
 
 function getSensors() {
@@ -49,8 +52,25 @@ function getSensors() {
         if (data.result) {
             sensors = data.payload;
         } else {
-            //need a place to publish notifications
+            $(".navbar-brand").notify(data.text, "error");
         }
+    }).error(function(data) {
+        $(".navbar-brand").notify("failed to fetch sensors from api","error");
+    });
+}
+
+function getSensorGroups() {
+    $.getJSON("/api/sensorgroups", function (data) {
+        if (data.result) {
+            sensorgroups = data.payload;
+            if ($("#sensorgroup-nav-list") != undefined) {
+                populateSensorGroups();
+            }
+        } else {
+            $(".navbar-brand").notify(data.text, "error");
+        }
+    }).error(function(data) {
+        $(".navbar-brand").notify("failed to fetch sensor groups from api","error");
     });
 }
 

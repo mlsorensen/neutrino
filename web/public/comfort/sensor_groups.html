@@ -1,5 +1,28 @@
-<div class="jumbotron">
-  <div class="container">
-    Sensor groups, make some.
-  </div>
+<div id='comfort-sensorgroups-div'>
+    <div class='navbar-left col-md-2'>
+        <ul id='sensorgroup-nav-list' class="nav nav-pills nav-stacked" style="float:left;">
+        </ul>
+    </div>
+    <div class='col-md-7'>
+    <div id='sensorgroup-detail' class="panel panel-default" style="float:left">
+        <div class="panel-heading clearfix">
+            <div class="input-group pull-left col-md-5">
+                <span id="sensorgroup-name-input-label" class="input-group-addon">name</span>
+                <input id="sensorgroup-name-input" type="text" class="form-control" placeholder='new name here'>
+                <span id="sensorgroup-name-save" class="input-group-addon btn btn-default">
+                    <span class="glyphicon glyphicon-save"></span>
+                </span>
+            </div>
+            <div id="sensorgroup-sensorselect-dropdown" class="dropdown hidden" style="float:right">
+                <a class="dropdown-toggle btn btn-default" data-toggle="dropdown" href="#">Sensors <b class="caret"></b></a>
+                <ul id="sensorgroup-sensorselect-list" style="padding: 5px 10px 0;max-height:400px;overflow-y:scroll" 
+                    class="dropdown-menu dropdown-meun-form" role="menu">
+                </ul>
+            </div>
+        </div>
+        <div id="sensorgroup-detail-inner" class="panel-body">
+            <div id="sensorgroup-graph" style="width:600px;height:400px;"></div>
+        </div>
+    </div>
+    </div>
 </div>
