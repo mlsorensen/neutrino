@@ -93,7 +93,7 @@ function renderSensorGraph(sensor, value, hours, targetdiv) {
         var options = {
             axisLabels: {show:true},
             series: {shadowSize:5, lines:{show:true},},
-            xaxes: [{mode:"time", timezone: "browser"}],
+            xaxes: [{mode:"time", timezone: "browser", twelveHourClock: true}],
             yaxes: [{alignTicksWithAxis:1, position:"right", axisLabel:templabel, autoscaleMargin:4},
                     {alignTicksWithAxis:1, position:"left", axisLabel:humlabel}],
             legend: {position:'sw'}
@@ -123,6 +123,8 @@ function populateSensors() {
         $("#sensor-panel-title").html(event.target.id);
         renderVoltage($(this));
     });
+
+    $(".nav-stacked > .sensor > a").first().trigger("click");
 
     // save sensor name edit
     $("#sensor-name-save").on("click", function(event) {
