@@ -3,16 +3,19 @@
         <ul id='sensor-nav-list' class="nav nav-pills nav-stacked" style="float:left;">
         </ul>
     </div>
-    <div class='col-md-5'>
+    <div class='col-md-7'>
     <div id='sensor-detail' class="panel panel-default" style="float:left">
-        <div class="panel-heading">
-            <div class="input-group col-md-6">
-                <span class="input-group-addon">name</span>
+        <div class="panel-heading clearfix">
+            <div id="sensor-panel-title" class="panel-title pull-left col-md-2" style="font-size:1.3em">sensor ?</div>
+            <div class="input-group pull-left col-md-5">
+                <span id="sensor-name-input-label" class="input-group-addon">name</span>
                 <input id="sensor-name-input" type="text" class="form-control">
                 <span id="sensor-name-save" class="input-group-addon btn btn-default">
                     <span class="glyphicon glyphicon-save"></span>
                 </span>
             </div>
+            <span id='sensor-voltage-span' class="label label-default pull-right" style="font-size:1.3em">
+            <div class="glyphicon glyphicon-flash pull-left" /><div id='sensor-voltage-value' class='pull-right'>Volts</div></span>
         </div>
         <div id="sensor-detail-inner" class="panel-body">
             <div id="sensor-graph" style="width:600px;height:400px;"></div>

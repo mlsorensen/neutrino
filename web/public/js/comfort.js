@@ -14,6 +14,7 @@ $(document).on('DOMNodeInserted', function(event) {
     var weatherinterval = -1;
 
     if (event.target.id == 'comfort-home-div') {
+        // populate weather
         var interval = setInterval(function() {
             if (config.location.value == undefined) {
                 return;
@@ -42,45 +43,65 @@ $(document).on('DOMNodeInserted', function(event) {
             populateSensors();
         }, 200);
     }
-
-/* graph proof of concept
-        $.getJSON("/api/sensors/0/data?value=temperature&hours=72", function (data) {
-            if(data.result) {
-                var graphdata = [];
-                for (i = 0; i < data.payload.length; i++) {
-                    var element = [];
-                    element[0] = data.payload[i].epoch * 1000;
-                    element[1] = data.payload[i].temperature;
-                    graphdata[i] = element;
-                } 
-                var dataset = [{data :graphdata, label:'sensor0',color: "#0062E3",lines:{show:true},curvedLines: {apply:true}}];
-                var options = { series: {shadowSize:5, curvedLines:{active:true}}, xaxes:[{mode:"time"}], yaxis:{axisLabel:"Temperature"}};
-                $.plot($("#sensor1-graph"), dataset, options );
-            }
-        });
-*/
 });
 
-function renderSensorGraph(sensor, value, hours, targetdiv) {
-    $.getJSON("/api/sensors/" + sensor[0].id.replace("sensor","") + "/data?value=" + value + "&hours=" + hours, function (data) {
+function renderVoltage(sensor) {
+    $.getJSON("/api/sensors/" + sensor[0].id.replace("sensor ","") + "/data?value=voltage&hours=1", function (data) {
         if(data.result) {
-            var graphdata = [];
-            for (i = 0; i < data.payload.length; i++) {
-                var element = [];
-                element[0] = data.payload[i].epoch * 1000;
-                element[1] = data.payload[i].temperature;
-                graphdata[i] = element;
+            var voltage = data.payload[data.payload.length-1].voltage;
+            $("#sensor-voltage-value").html(voltage + " V");
+            if (voltage > 2.5) {
+                $("#sensor-voltage-span").addClass('label-success');
+            } else if (voltage > 2.2) {
+                $("#sensor-voltage-span").addClass('label-warning');
+            } else {
+                $("#sensor-voltage-span").addClass('label-danger');
             }
-            var dataset = [{data :graphdata, label:sensor.html(), color: "#0062E3", lines:{show:false} }];
-            var options = { series: {shadowSize:5, lines:{show:false},splines:{show:true, tension:.1}}, xaxes:[{mode:"time"}], yaxis:{axisLabel:"Temperature"}};
-            $.plot($("#sensor-graph"), dataset, options );
-            $("#sensor-graph").css("background", "linear-gradient(to top, #ebebeb , white)");
         } else {
-            $("#sensor-graph").notify("unexpected server response", "error");
+
         }
-    }).error(function(data) {
-        $("#sensor-graph").notify("server error" + $.parseJSON(data.responseText).text, "error");
     });
+}
+
+function getSensorData(sensor, hours, datatype) {
+    var graphdata = [];
+    var data = JSON.parse($.ajax({
+        type: "GET",
+        url: "/api/sensors/" + sensor[0].id.replace("sensor","") + "/data?value=" + datatype + "&hours=" + config.graphtime.value,
+        async: false
+    }).responseText);
+
+    if (data.result) {
+        for (i = 0; i < data.payload.length; i++) {
+            var element = [];
+            element[0] = data.payload[i].epoch * 1000;
+            element[1] = parseFloat(data.payload[i][datatype]);
+        graphdata[i] = element;
+        }
+    }
+    return graphdata;
+}
+
+function renderSensorGraph(sensor, value, hours, targetdiv) {
+    var temperaturedata = getSensorData(sensor, hours, "temperature");
+    var humiditydata    = getSensorData(sensor, hours, "humidity");
+    var templabel = 'Degrees ' + config.tempunits.value;
+    var humlabel = 'Humidity % ';
+    if (temperaturedata.length > 0) {
+        var dataset = [{data:humiditydata, label:humlabel, color:"green", lines:{show:true}, yaxis: 2},
+                       {data:temperaturedata, label:templabel, color: "#0062E3", lines:{show:true}}];
+        var options = {
+            axisLabels: {show:true},
+            series: {shadowSize:5, lines:{show:true},},
+            xaxes: [{mode:"time", timezone: "browser"}],
+            yaxes: [{alignTicksWithAxis:1, position:"right", axisLabel:templabel, autoscaleMargin:4},
+                    {alignTicksWithAxis:1, position:"left", axisLabel:humlabel}],
+            legend: {position:'sw'}
+        };
+
+        $.plot($("#sensor-graph"), dataset, options );
+        $("#sensor-graph").css("background", "linear-gradient(to top, #ebebeb , white)");
+    }
 }
 
 
@@ -88,8 +109,8 @@ function renderSensorGraph(sensor, value, hours, targetdiv) {
 function populateSensors() {
     for (i = 0; i < sensors.length; i++) {
         var $row = "<li class='sensor'><a id='sensor" + sensors[i].sensor_address + "' href='#'>sensor " + sensors[i].sensor_address + "</a></li>";
-        if(sensors[i].display_name != null) { 
-            var $row = "<li class='sensor'><a id='sensor" + sensors[i].sensor_address + "' href='#'>" + sensors[i].display_name + "</a></li>";
+        if (sensors[i].display_name != null) { 
+            var $row = "<li class='sensor'><a id='sensor " + sensors[i].sensor_address + "' href='#'>" + sensors[i].display_name + "</a></li>";
         }
         $("#sensor-nav-list").append($row);
     }
@@ -99,6 +120,8 @@ function populateSensors() {
         $(this).parent().addClass('active');
         renderSensorGraph($(this), "temperature", 6, $("#sensor-graph"));
         $("#sensor-name-input").val($(this).html());
+        $("#sensor-panel-title").html(event.target.id);
+        renderVoltage($(this));
     });
 
     // save sensor name edit
@@ -118,6 +141,8 @@ function populateSensors() {
 function populateWeather() {
     $("#home-location-value").html(config.location.value);
     if (weather != undefined) {
+        console.log(weather);
+        console.log(weather.weather);
         $("#home-weather-value").html(weather.weather[0].description +
                                       "<img src='http://openweathermap.org/img/w/" + weather.weather[0].icon + ".png' />");
         if (config.tempunits.value == 'Celsius') {

@@ -2,6 +2,7 @@
 use Mojolicious::Lite;
 use Mojolicious::Validator;
 use Mojolicious::Validator::Validation;
+use Mojo::UserAgent;
 use DateTime;
 use Data::Dumper;
 use DBI;
@@ -29,6 +30,28 @@ get "/date" => sub {
     my $self = shift;
     my $date;
     $self->render(json => { result => 1, payload => $date });
+};
+
+get "/weather" => sub {
+    my $self = shift;
+    my $dbh = _mysql_dbh($self, $config) or return;
+    my $sth = $dbh->prepare("SELECT value from configuration where name='location'");
+    $sth->execute();
+    my $row = $sth->fetchrow_hashref();
+    $sth->finish();
+    if (exists $row->{value}) {
+        my $ua = Mojo::UserAgent->new();
+        $ua->max_redirects(0)->connect_timeout(6)->request_timeout(10);
+        my $tx = $ua->get("http://api.openweathermap.org/data/2.5/weather?q=$row->{value}" => {DNT => 1});
+        if (my $res = $tx->success) { 
+            $self->render(json => { result => 1, payload => $res->body}); 
+        } else {
+            my $err = $tx->error;
+            $self->render(json => { result => 0, text => 'Unable to fetch weather from openweathermap.org' }, status => $err->{code});
+        }
+    } else {
+        $self->render(json => { result => 0, text => 'no location config found, no weather queried' }, status => 404);
+    }
 };
 
 get "/sensors" => sub {

@@ -55,13 +55,29 @@ function getSensors() {
 }
 
 function getWeather() {
+    $.getJSON("/api/weather", function(data) {
+        if(data.result) {
+            weather = data.payload;
+            $(".navbar-brand").notify("updated weather info","success");
+        } else {
+            $(".navbar-brand").notify(data.text, "error");
+        }
+    }).error(function(data) {
+        $(".navbar-brand").notify("failed to fetch weather from api","error");
+    });
+/*
     $.getJSON("http://api.openweathermap.org/data/2.5/weather?q=" + config.location.value, function (data) {
         if (typeof data.main != "undefined") {
             weather = data;
+            $(".navbar-brand").notify("updated weather info","success");
         } else {
             //alert
+            
         }
+    }).error(function() {
+        $(".navbar-brand").notify("failed to update weather info","error");
     });
+*/
 }
 
 
