@@ -139,10 +139,11 @@ function populateSensors() {
 }
 
 function populateWeather() {
+    if ($("#home-location-value") == undefined) {
+        return;
+    }
     $("#home-location-value").html(config.location.value);
     if (weather != undefined) {
-        console.log(weather);
-        console.log(weather.weather);
         $("#home-weather-value").html(weather.weather[0].description +
                                       "<img src='http://openweathermap.org/img/w/" + weather.weather[0].icon + ".png' />");
         if (config.tempunits.value == 'Celsius') {
