@@ -38,7 +38,8 @@ CREATE TABLE neutrino.controller (
   `type` enum('temperature','humidity') NOT NULL,
   `setpoint` float DEFAULT NULL,
   `tolerance` float NOT NULL DEFAULT 3,
-  `active` tinyint(3) unsigned,
+  `enabled` tinyint(3) unsigned,
+  `status` enum('heating','cooling','fan','idle') NOT NULL DEFAULT 'idle',
   `fan_mode` enum('on','auto') NOT NULL DEFAULT 'auto',
    PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
