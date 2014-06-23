@@ -64,7 +64,11 @@ function getSensorGroups() {
         if (data.result) {
             sensorgroups = data.payload;
             if ($("#sensorgroup-nav-list") != undefined) {
-                populateSensorGroups();
+                if($(".sensorgroup.active > a")[0] != undefined) {
+                    populateSensorGroups($(".sensorgroup.active > a")[0].id);
+                } else {
+                    populateSensorGroups();
+                }
             }
         } else {
             $(".navbar-brand").notify(data.text, "error");

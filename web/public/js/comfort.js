@@ -151,24 +151,25 @@ function populateSensors() {
     });
 }
 
-function populateSensorGroups() {
+function populateSensorGroups(activesensorid) {
     $("#sensorgroup-nav-list").html("");
     var sensornavrow;
     for (i = 0; i < sensorgroups.length; i++) {
-        sensornavrow = "<li class='sensorgroup'><a id='sensorgroup "+ sensorgroups[i].id + "' href='#'>" + sensorgroups[i].display_name + "</a></li>";
+        if (activesensorid != undefined && activesensorid == "sensorgroup " + sensorgroups[i].id) {
+            sensornavrow = "<li class='sensorgroup active'><a id='sensorgroup "+ sensorgroups[i].id + "' href='#'>" + sensorgroups[i].display_name + "</a></li>";
+        } else {
+            sensornavrow = "<li class='sensorgroup'><a id='sensorgroup "+ sensorgroups[i].id + "' href='#'>" + sensorgroups[i].display_name + "</a></li>";
+        }
         $("#sensorgroup-nav-list").append(sensornavrow);
     }
 
-    // add + sign to sensorgroup nav
-    //$("#sensorgroup-nav-list").append("<li class='sensorgroup'><a id='addsensorgroup' href='#'></a></li>");
+    // add  a + sign to sensorgroup nav
     sensornavrow = "<li class=''><a id='addsensorgroup' class='glyphicon glyphicon-plus label-info'" + 
                    " style='color:white;text-align:center' href='#'></a></li>";
     $("#sensorgroup-nav-list").append(sensornavrow);
 
     $("#addsensorgroup").on("click", function() {
-        $(".nav-stacked > .sensorgroup").removeClass('active');
-        $("#sensorgroup-sensorselect-dropdown").addClass('hidden');
-        $("#sensorgroup-name-input").val("");
+        $("#comfort-sensor_groups").trigger("click");
     });
 
     // populate info on selected sensor group 
@@ -179,6 +180,7 @@ function populateSensorGroups() {
 
         // populate sensor select dropdown
         $("#sensorgroup-sensorselect-dropdown").removeClass('hidden');
+        $("#sensorgroup-delete").removeClass('hidden');
         $("#sensorgroup-sensorselect-list").html('');
         for(i = 0; i < sensors.length; i++) {
             //var li = '<li><a id=sensor "' + sensors[i].id + '" class="sensorgroup-sensorselect-item" href="#">' + sensors[i].display_name + '</a></li>';
@@ -192,28 +194,43 @@ function populateSensorGroups() {
             e.stopPropagation();
         });
 
-        // save selections when focus lost
+        // save sensors
         $('#sensorgroup-sensorselect-list').on('change', function(e) {
             console.log("save sensors");
+        });
+    });
+
+    //delete group
+    $('#sensorgroup-delete').on('click', function(e) {
+        var sensorid = $(".sensorgroup.active > a")[0].id.replace("sensorgroup ","");
+        $.ajax({url: "/api/sensorgroups/" + sensorid,
+                type: 'DELETE',
+                success: function(data) {
+                    getSensorGroups();
+                    $("#addsensorgroup").trigger("click");
+                    //$(".nav-stacked > .sensorgroup.active > a")[0].remove();
+                },
+                error: function(data) {
+                    $("#sensorgroup-delete").notify("error on deleting group", "error");
+                }
         });
     });
 
     // save new sensor group or save name
     $("#sensorgroup-name-save").on("click", function(event) {
         var newname = $("#sensorgroup-name-input").val();
-        // add new if current context is new sensor vs updating name on existing
-        if ($(".active.sensorgroup").length != 0) {
-            console.log($(".active.sensorgroup"));
-            var sensorgroupid = $(".active.sensorgroup > a")[0].id.replace("sensorgroup ","");
+        // if current context is existing sensor group, rename it. Otherwise, create new sensor group
+        if ($(".sensorgroup.active > a").length != 0) {
+            var sensorgroupid = $(".sensorgroup.active > a")[0].id.replace("sensorgroup ","");
             var newname = $("#sensorgroup-name-input").val();
-            $.post("/api/sensorgroups/" + sensorid + "/name", {"value": newname}, function(data) {
+            $.post("/api/sensorgroups/" + sensorgroupid + "/name", {"value": newname}, function(data) {
                 $("#sensorgroup-name-save").notify(data.text, "info");
                 $(".active.sensorgroup > a").html(newname);
                 getSensorGroups();
+                
             }).error(function(data) {
-                $("#sensor-name-save").notify("error on saving name:" + $.parseJSON(data.responseText).text, "error");
+                $("#sensorgroup-name-save").notify("error on saving name", "error");
             });
-
         } else {
             $.ajax({url: "/api/sensorgroups",
                     type: 'PUT',
@@ -224,7 +241,7 @@ function populateSensorGroups() {
                         getSensorGroups();
                     },
                     error: function(data) {
-                        $("#sensor-name-save").notify("error on saving newgroup" + $.parseJSON(data.responseText).text, "error");
+                        $("#sensorgroup-name-save").notify("error on saving newgroup" + $.parseJSON(data.responseText).text, "error");
                     }
             });
         }
