@@ -1,5 +1,6 @@
 var config;
 var sensors;
+var sensorgroups;
 var weather;
 
 $(document).ready(function(){

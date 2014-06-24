@@ -73,9 +73,19 @@ get "/sensorgroups" => sub {
     my $dbh  = _mysql_dbh($self, $config) or return;
     my $sth  = $dbh->prepare("SELECT * from sensorgroup");
     $sth->execute();
-    my $data = $sth->fetchall_arrayref({});
+    my $data = $sth->fetchall_hashref('id');
     $sth->finish();
     if (!$dbh->errstr()) {
+        # insert group members as well
+        foreach my $key (keys %{$data}) {
+            $sth = $dbh->prepare("SELECT sensor_address,display_name,sensor_group,sensor.id,sensorgroup_id " .
+                                    "from sensor,sensor_tie where sensor_tie.sensor_id = sensor.id and sensor_tie.sensorgroup_id=$key");
+            $sth->execute();
+            if(!$dbh->errstr()) {
+                $data->{$key}->{members} = $sth->fetchall_hashref('id');
+            }
+            $sth->finish();
+        }
         $self->render(status => 200, json => { result => 1, payload => $data});
     } else {
         $self->render(status => 500, json => { result => 0, payload => 'Database error occurred'});
@@ -146,6 +156,88 @@ post "/sensorgroups/:id/name" => sub {
         $self->render(status => 500, json => { result => 0, text => 'failed to update database:' + $dbh->errstr()});
     }
     $self->render(status => 200, json => { result => 1, text => 'success' });
+};
+
+get "/sensorgroups/:id/sensors" => sub {
+    my $self       = shift;
+    my $id         = $self->param('id');
+    my $validator  = Mojolicious::Validator->new;
+    my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
+
+    $validation->input({'id' => $id});
+    $validation->required('id')->like(qr/^\d+$/);
+    if(! $validation->is_valid) {
+        $self->render(status => 406, json => { result => 0, text => "id or value provided did not match character validation"} );
+        return;
+    }
+
+    my $dbh = _mysql_dbh($self, $config) or return;
+    my $sth = $dbh->prepare("SELECT sensor_address,display_name,sensor_group,sensor.id,sensorgroup_id " .
+                            "from sensor,sensor_tie where sensor_tie.sensor_id = sensor.id and sensor_tie.sensorgroup_id=$id");
+    $sth->execute();
+    if(!$dbh->errstr()) {
+        my $data = $sth->fetchall_arrayref({});
+        $self->render(status => 200, json => { result => 1, payload => $data});
+    } else {
+        $self->render(status => 500, json => { result => 0, text => 'failed to query sensors for sensor group'});
+    }
+};
+
+put "/sensorgroups/:id/sensors/:value" => sub {
+    my $self       = shift;
+    my $id         = $self->param('id');
+    my $sensorid   = $self->param('value');
+    my $validator  = Mojolicious::Validator->new;
+    my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
+
+    $validation->input({'id' => $id, 'sensorid' => $sensorid});
+    $validation->required('id')->like(qr/^\d+$/);
+    $validation->required('sensorid')->like(qr/^\d+$/);
+    if(! $validation->is_valid) {
+        $self->render(status => 406, json => { result => 0, text => "id or value provided did not match character validation"} );
+        return;
+    }
+
+    my $dbh = _mysql_dbh($self, $config) or return;
+    # does relationship already exist?
+    my $sth = $dbh->prepare("SELECT * FROM sensor_tie WHERE sensor_id=$sensorid AND sensorgroup_id=$id");
+    $sth->execute();
+    if(!defined($sth->fetchrow_arrayref())) {
+        $dbh->do("INSERT INTO sensor_tie (sensor_id, sensorgroup_id) VALUES (?, ?)", undef, $sensorid, $id);
+        if (!$dbh->errstr()) {
+            $self->render(status => 200, json => { result => 1, text => "success"});
+        } else {
+            $self->render(status => 500, json => { result => 0, text => "unable to insert into database"});
+        }
+    } else {
+        # it already exists
+        $self->render(status => 200, json => { result => 1, text => "success"});
+    }
+};
+
+del "/sensorgroups/:id/sensors/:value" => sub {
+    my $self       = shift;
+    my $id         = $self->param('id');
+    my $sensorid   = $self->param('value');
+    my $validator  = Mojolicious::Validator->new;
+    my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
+
+    $validation->input({'id' => $id, 'sensorid' => $sensorid});
+    $validation->required('id')->like(qr/^\d+$/);
+    $validation->required('sensorid')->like(qr/^\d+$/);
+    if(! $validation->is_valid) {
+        $self->render(status => 406, json => { result => 0, text => "id or value provided did not match character validation"} );
+        return;
+    }
+
+    my $dbh = _mysql_dbh($self, $config) or return;
+    $dbh->do("DELETE FROM sensor_tie WHERE sensor_id=? and sensorgroup_id=?", undef, $sensorid, $id);
+    if (!$dbh->errstr()) {
+        $self->render(status => 200, json => { result => 1, text => "success"});
+    } else {
+        $self->render(status => 500, json => { result => 0, text => "unable to delete from database"});
+    }
+
 };
 
 get "/sensors/:id/data" => sub {

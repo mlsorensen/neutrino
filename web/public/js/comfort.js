@@ -79,7 +79,7 @@ function getSensorData(sensor, hours, datatype) {
     var graphdata = [];
     var data = JSON.parse($.ajax({
         type: "GET",
-        url: "/api/sensors/" + sensor[0].id.replace("sensor","") + "/data?value=" + datatype + "&hours=" + config.graphtime.value,
+        url: "/api/sensors/" + sensor[0].id.replace("sensor ","") + "/data?value=" + datatype + "&hours=" + config.graphtime.value,
         async: false
     }).responseText);
 
@@ -118,7 +118,7 @@ function renderSensorGraph(sensor, value, hours, targetdiv) {
 
 function populateSensors() {
     for (i = 0; i < sensors.length; i++) {
-        var $row = "<li class='sensor'><a id='sensor" + sensors[i].sensor_address + "' href='#'>sensor " + sensors[i].sensor_address + "</a></li>";
+        var $row = "<li class='sensor'><a id='sensor " + sensors[i].sensor_address + "' href='#'>sensor " + sensors[i].sensor_address + "</a></li>";
         if (sensors[i].display_name != null) { 
             var $row = "<li class='sensor'><a id='sensor " + sensors[i].sensor_address + "' href='#'>" + sensors[i].display_name + "</a></li>";
         }
@@ -154,11 +154,11 @@ function populateSensors() {
 function populateSensorGroups(activesensorid) {
     $("#sensorgroup-nav-list").html("");
     var sensornavrow;
-    for (i = 0; i < sensorgroups.length; i++) {
-        if (activesensorid != undefined && activesensorid == "sensorgroup " + sensorgroups[i].id) {
-            sensornavrow = "<li class='sensorgroup active'><a id='sensorgroup "+ sensorgroups[i].id + "' href='#'>" + sensorgroups[i].display_name + "</a></li>";
+    for (var key in sensorgroups) {
+        if (activesensorid != undefined && activesensorid == "sensorgroup " + sensorgroups[key].id) {
+            sensornavrow = "<li class='sensorgroup active'><a id='sensorgroup "+ sensorgroups[key].id + "' href='#'>" + sensorgroups[key].display_name + "</a></li>";
         } else {
-            sensornavrow = "<li class='sensorgroup'><a id='sensorgroup "+ sensorgroups[i].id + "' href='#'>" + sensorgroups[i].display_name + "</a></li>";
+            sensornavrow = "<li class='sensorgroup'><a id='sensorgroup "+ sensorgroups[key].id + "' href='#'>" + sensorgroups[key].display_name + "</a></li>";
         }
         $("#sensorgroup-nav-list").append(sensornavrow);
     }
@@ -182,10 +182,18 @@ function populateSensorGroups(activesensorid) {
         $("#sensorgroup-sensorselect-dropdown").removeClass('hidden');
         $("#sensorgroup-delete").removeClass('hidden');
         $("#sensorgroup-sensorselect-list").html('');
+        var sensorgroupid = event.target.id.replace("sensorgroup ","");
+        console.log($(this));
         for(i = 0; i < sensors.length; i++) {
-            //var li = '<li><a id=sensor "' + sensors[i].id + '" class="sensorgroup-sensorselect-item" href="#">' + sensors[i].display_name + '</a></li>';
-            var li = '<li><label class="checkbox"><input id="sensorgroup-sensor ' + sensors[i].id 
-                     + '" type="checkbox">' + sensors[i].display_name + '</label></li>';
+            var li;
+            var sensorid = sensors[i].id;
+            if (sensorgroups[sensorgroupid] != undefined && sensorgroups[sensorgroupid].members[sensorid] != undefined) {
+                li = '<li><label class="checkbox"><input id="sensorgroup-sensor ' + sensors[i].id +
+                     '" type="checkbox" checked>' + sensors[i].display_name + '</label></li>';
+            } else {
+                li = '<li><label class="checkbox"><input id="sensorgroup-sensor ' + sensors[i].id +
+                     '" type="checkbox">' + sensors[i].display_name + '</label></li>';
+            }
             $("#sensorgroup-sensorselect-list").append(li);
         }
 
@@ -194,9 +202,19 @@ function populateSensorGroups(activesensorid) {
             e.stopPropagation();
         });
 
-        // save sensors
-        $('#sensorgroup-sensorselect-list').on('change', function(e) {
-            console.log("save sensors");
+        // save sensors to sensorgroups
+        $('#sensorgroup-sensorselect-list > li > label > input').on('change', function(e) {
+            console.log($(this));
+            var sensorid = $(this)[0].id.replace("sensorgroup-sensor ", "");
+            var sensorgroupid = $(".sensorgroup.active > a")[0].id.replace("sensorgroup ", "");
+            if ($(this).is(':checked')) {
+                addSensorToGroup(sensorid, sensorgroupid);
+                console.log("adding sensor id " + sensorid + " to sensorgroup id " + sensorgroupid);
+            } else {
+                removeSensorFromGroup(sensorid, sensorgroupid);
+                console.log("removing sensor id " + sensorid + " from sensorgroup id " + sensorgroupid);
+            }
+            getSensorGroups();
         });
     });
 
@@ -246,6 +264,24 @@ function populateSensorGroups(activesensorid) {
             });
         }
     });
+}
+
+function addSensorToGroup(sensorid, sensorgroupid) {
+    $.ajax({url: "/api/sensorgroups/" + sensorgroupid + "/sensors/" + sensorid,
+            type: "PUT",
+            async: false,
+            success: function() { $("#sensorgroup-sensorselect-list").notify("added", "info")},
+            error: function() { $("#sensorgroup-sensorselect-list").notify("failure to add", "error")}
+            });
+}
+
+function removeSensorFromGroup(sensorid, sensorgroupid) {
+    $.ajax({url:     "/api/sensorgroups/" + sensorgroupid + "/sensors/" + sensorid,
+            type:    "DELETE",
+            async:   false,
+            success: function() {$("#sensorgroup-sensorselect-list").notify("removed", "info")},
+            error:   function() {$("#sensorgroup-sensorselect-list").notify("failure to remove", "error")}
+           });
 }
 
 function populateWeather() {
