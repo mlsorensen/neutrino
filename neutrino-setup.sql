@@ -47,7 +47,7 @@ CREATE TABLE neutrino.controller (
 CREATE TABLE neutrino.sensorgroup (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `display_name` varchar(255) NOT NULL,
-  `controller_id` int(10) unsigned DEFAULT NULL,
+  `controller_id` int(10) unsigned UNIQUE DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `controller_id` (`controller_id`),
   CONSTRAINT `sensorgroup_ibfk_1` FOREIGN KEY (`controller_id`) REFERENCES `controller` (`id`)

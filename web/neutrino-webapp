@@ -59,7 +59,7 @@ get "/sensors" => sub {
     my $dbh  = _mysql_dbh($self, $config) or return;
     my $sth  = $dbh->prepare("SELECT * from sensor");
     $sth->execute();
-    my $data = $sth->fetchall_arrayref({});
+    my $data = $sth->fetchall_hashref('id');
     $sth->finish();
     if (!$dbh->errstr()) {
         $self->render(status => 200, json => { result => 1, payload => $data});
@@ -79,6 +79,38 @@ get "/controllers" => sub {
         $self->render(status => 200, json => { result => 1, payload => $data});
     } else {
         $self->render(status => 500, json => { result => 0, payload => 'Database error occurred:' . $dbh->errstr()});
+    }
+};
+
+post "/controllers/:id/sensorgroup" => sub {
+    my $self  = shift;
+    my $id    = $self->param('id');
+    my $group = $self->param('value');
+    my $validator  = Mojolicious::Validator->new;
+    my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
+
+    $validation->input({'id' => $id, 'group' => $group});
+    $validation->required('id')->like(qr/^\d+$/);
+    $validation->required('group')->like(qr/^\d+$/);
+    if(! $validation->is_valid) {
+        $self->render(status => 406, json => { result => 0, text => "data provided did not match character validation"} );
+        return;
+    }
+
+    if($id == 0) {
+        $id = undef;
+    }
+
+    my $dbh  = _mysql_dbh($self, $config) or return;
+    $dbh->do("UPDATE sensorgroup set controller_id=? where id=?",undef, $id, $group);   
+    if (!$dbh->errstr()) {
+        $self->render(status => 200, json => { result => 1, text => 'success'});
+    } else {
+        if ($dbh->errstr() =~ /Duplicate/) {
+            $self->render(status => 500, json => { result => 0, text => 'Controller is already associated with another sensor group'});
+        } else {
+            $self->render(status => 500, json => { result => 0, text => 'Failed to update group and controller:' . $dbh->errstr()});
+        }
     }
 };
 
