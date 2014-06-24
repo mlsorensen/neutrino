@@ -226,10 +226,9 @@ function populateSensorGroups(activesensorid) {
                 success: function(data) {
                     getSensorGroups();
                     $("#addsensorgroup").trigger("click");
-                    //$(".nav-stacked > .sensorgroup.active > a")[0].remove();
                 },
                 error: function(data) {
-                    $("#sensorgroup-delete").notify("error on deleting group", "error");
+                    $("#sensorgroup-delete").notify($.parseJSON(data.responseText).text, "error");
                 }
         });
     });
@@ -270,8 +269,8 @@ function addSensorToGroup(sensorid, sensorgroupid) {
     $.ajax({url: "/api/sensorgroups/" + sensorgroupid + "/sensors/" + sensorid,
             type: "PUT",
             async: false,
-            success: function() { $("#sensorgroup-sensorselect-list").notify("added", "info")},
-            error: function() { $("#sensorgroup-sensorselect-list").notify("failure to add", "error")}
+            success: function() { $("#sensorgroup-sensorselect-list").notify("added", "info", {autoHideDelay:1000})},
+            error: function() { $("#sensorgroup-sensorselect-list").notify("failure to add", "error", {autoHideDelay:1000})}
             });
 }
 
@@ -279,8 +278,8 @@ function removeSensorFromGroup(sensorid, sensorgroupid) {
     $.ajax({url:     "/api/sensorgroups/" + sensorgroupid + "/sensors/" + sensorid,
             type:    "DELETE",
             async:   false,
-            success: function() {$("#sensorgroup-sensorselect-list").notify("removed", "info")},
-            error:   function() {$("#sensorgroup-sensorselect-list").notify("failure to remove", "error")}
+            success: function() {$("#sensorgroup-sensorselect-list").notify("removed", "info", {autoHideDelay:1000})},
+            error:   function() {$("#sensorgroup-sensorselect-list").notify("failure to remove", "error", {autoHideDelay:1000})}
            });
 }
 

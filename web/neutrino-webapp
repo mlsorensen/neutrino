@@ -130,9 +130,14 @@ del "/sensorgroups/:id" => sub {
     my $dbh = _mysql_dbh($self, $config) or return;
     $dbh->do("delete from sensorgroup where id=?", undef, $id);
     if($dbh->errstr()) {
-        $self->render(status => 500, json => { result => 0, text => 'failed to delete from database:' + $dbh->errstr()});
+        if ($dbh->errstr() =~ /foreign key constraint fails/) {
+            $self->render(status => 500, json => { result => 0, text => 'Cannot delete group with sensors attached'});
+        } else {
+            $self->render(status => 500, json => { result => 0, text => 'failed to delete from database:' . $dbh->errstr()});
+        }
+    } else {
+        $self->render(status => 200, json => { result => 1, text => 'success' });
     }
-    $self->render(status => 200, json => { result => 1, text => 'success' });
 };
 
 post "/sensorgroups/:id/name" => sub {
