@@ -68,6 +68,20 @@ get "/sensors" => sub {
     }
 };
 
+get "/controllers" => sub {
+    my $self = shift;
+    my $dbh  = _mysql_dbh($self, $config) or return;
+    my $sth  = $dbh->prepare("SELECT * from controller");
+    $sth->execute();
+    my $data = $sth->fetchall_hashref('id');
+    $sth->finish();
+    if (!$dbh->errstr()) {
+        $self->render(status => 200, json => { result => 1, payload => $data});
+    } else {
+        $self->render(status => 500, json => { result => 0, payload => 'Database error occurred:' . $dbh->errstr()});
+    }
+};
+
 get "/sensorgroups" => sub {
     my $self = shift;
     my $dbh  = _mysql_dbh($self, $config) or return;

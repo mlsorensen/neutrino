@@ -2,6 +2,7 @@ var config;
 var sensors;
 var sensorgroups;
 var weather;
+var controllers;
 
 $(document).ready(function(){
     ////////////////////
@@ -24,11 +25,12 @@ $(document).ready(function(){
     
     getConfig();
     getSensors();
+    getControllers();
     getSensorGroups();
 
     // weather is dependent on location
     var interval = setInterval(function() {
-        if (config.location.value == undefined) {
+        if ( config == undefined || config.location == undefined) {
             return;
         }
         getWeather();
@@ -57,6 +59,19 @@ function getSensors() {
         }
     }).error(function(data) {
         $(".navbar-brand").notify("failed to fetch sensors from api","error");
+    });
+}
+
+function getControllers() {
+    $.getJSON("/api/controllers", function (data) {
+        if (data.result) {
+            controllers = data.payload;
+            console.log(controllers);
+        } else {
+            $(".navbar-brand").notify(data.text, "error");
+        }
+    }).error(function(data) {
+        $(".navbar-brand").notify("failed to fetch controllers from api","error");
     });
 }
 

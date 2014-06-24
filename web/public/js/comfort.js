@@ -178,6 +178,17 @@ function populateSensorGroups(activesensorid) {
         $(this).parent().addClass('active');
         $("#sensorgroup-name-input").val($(this).html());
 
+        // populate controller select dropdown
+        $("#sensorgroup-controllerselect-dropdown").removeClass('hidden');
+        $("#sensorgroup-controllerbar").removeClass('hidden');
+        $("#sensorgroup-controllerselect-list").html('');
+        $("#sensorgroup-controllerselect-list").append('<li><a id="controller none" class="sensorgroup-controllerlist" href="#">none</a></li>');
+        for(var key in controllers) {
+            li = '<li><a id="controller ' + key + '" class="sensorgroup-controllerlist" href="#">' + 
+                  controllers[key].display_name + '</a></li>'
+            $("#sensorgroup-controllerselect-list").append(li);
+        }
+
         // populate sensor select dropdown
         $("#sensorgroup-sensorselect-dropdown").removeClass('hidden');
         $("#sensorgroup-delete").removeClass('hidden');
