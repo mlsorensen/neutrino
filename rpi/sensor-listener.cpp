@@ -47,7 +47,8 @@ void get_args(int argc, char *argv[]);
 void usage();
 bool zabbix_send(const char * key, const char * value);
 bool publish_zabbix(weather *w);
-int insert_neutrino_data(MYSQL *conn, weather *w);
+int insert_neutrino_data(weather *w);
+unsigned int get_sensor_id(MYSQL *conn, int sensorid, int sensorhubid);
 
 int main(int argc, char** argv) {
     //don't buffer what we print
@@ -59,16 +60,6 @@ int main(int argc, char** argv) {
 
     // set up radio
     radio_init();
-
-    // open database
-    MYSQL *conn;
-    conn = mysql_init(NULL);
-    if (!mysql_real_connect(conn, mysqlserver, mysqluser, mysqlpass, mysqldb, 0, NULL, 0)) {
-        fprintf(stderr, "Cant connect to database: %s\n", mysql_error(conn));
-        exit(1);
-    } else {
-        fprintf(stdout, "Connected to database\n");
-    }
 
     while(1) {
         if (radio.available()) {
@@ -89,7 +80,7 @@ int main(int argc, char** argv) {
                     publish_zabbix(&w);
                 }
 
-                if (insert_neutrino_data(conn, &w) == 0) {
+                if (insert_neutrino_data(&w) == 0) {
                     fprintf(stderr, "inserted data for node %d, sensorhub %d into db\n", w.addr, sensorhubid);
                 }
             } else {
@@ -105,9 +96,22 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-int insert_neutrino_data(MYSQL *conn, weather *w) {
+int insert_neutrino_data(weather *w) {
     char sql[256];
     int resultcode  = 0;
+    unsigned int sensorid = 0;
+    MYSQL_RES *res_set;
+    MYSQL_ROW row;
+    MYSQL *conn;
+
+    // open database, do this every time so that we reconnect in case of intermittent db outage
+    conn = mysql_init(NULL);
+    if (!mysql_real_connect(conn, mysqlserver, mysqluser, mysqlpass, mysqldb, 0, NULL, 0)) {
+        fprintf(stderr, "Cant connect to database: %s\n", mysql_error(conn));
+        exit(1);
+    } else {
+        fprintf(stdout, "Connected to database\n");
+    }
 
     // ensure sensor is in sensor table
     sprintf(sql,"INSERT IGNORE INTO sensor (sensor_address,sensor_hub_id) VALUES (%d, %d)", w->addr, sensorhubid);
@@ -115,15 +119,48 @@ int insert_neutrino_data(MYSQL *conn, weather *w) {
         fprintf(stderr, "SQL error on sensor insert: %s\n", mysql_error(conn));
         return -1;
     }
+    bzero(sql, 256);
+
+    // get sensor's db id
+    sensorid = get_sensor_id(conn, w->addr, sensorhubid);
+    if (sensorid == 0) {
+        return -1;
+    }
 
     // add data to data table
-    sprintf(sql,"insert into data (sensor_address, voltage, temperature, pressure) values (%d,%.3f,%.2f,%ld);",
-                w->addr, (float)w->millivolts/1000, (float)w->tempf/100, (long)w->pressurep);
+    sprintf(sql,"insert into data (sensor_id, voltage, temperature, pressure) values (%u,%.3f,%.2f,%ld);",
+                sensorid, (float)w->millivolts/1000, (float)w->tempf/100, (long)w->pressurep);
     if (mysql_query(conn, sql)) {
         fprintf(stderr, "SQL error on data insert: %s\n", mysql_error(conn));
         return -1;
     }
+
+    mysql_close(conn);
     return 0;
+}
+
+unsigned int get_sensor_id(MYSQL *conn, int sensor_addr, int sensor_hub_id) {
+    char sql[256];
+
+    sprintf(sql, "SELECT id FROM sensor where sensor_address=%d and sensor_hub_id=%d",sensor_addr, sensor_hub_id);
+    if (mysql_query(conn, sql)) {
+        fprintf(stderr, "could not fetch sensor id from db: %s\n", mysql_error(conn));
+        return 0;
+    }
+
+    MYSQL_RES *result = mysql_store_result(conn);
+
+    if (result == NULL) {
+        fprintf(stderr, "could not fetch sensor id from db: %s\n", mysql_error(conn));
+        return 0;
+    }
+
+    MYSQL_ROW row;
+
+    row = mysql_fetch_row(result);
+    unsigned int rowid = atoi(row[0]);
+    mysql_free_result(result);
+    return rowid;
 }
 
 void radio_init() {
