@@ -114,6 +114,33 @@ post "/controllers/:id/sensorgroup" => sub {
     }
 };
 
+post "/controllers/:id/:setting" => sub {
+    my $self    = shift;
+    my $id      = $self->param('id');
+    my $setting = $self->param('setting');
+    my $value   = $self->param('value');
+    my $validator  = Mojolicious::Validator->new;
+    my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
+
+    $validation->input({'id' => $id, 'setting' => $setting, 'value' => $value});
+    $validation->required('id')->like(qr/^\d+$/);
+    $validation->required('setting')->in('setpoint','enabled','fan_mode','tolerance');
+    $validation->required('value')->like(qr/^(\d+|auto|on)$/);
+    if(! $validation->is_valid) {
+        $self->render(status => 406, json => { result => 0, text => "data provided did not match character validation"} );
+        return;
+    }
+
+    my $dbh  = _mysql_dbh($self, $config) or return;
+
+    $dbh->do("UPDATE controller SET $setting=? WHERE id=?",undef, $value, $id);
+    if (!$dbh->errstr()) {
+        $self->render(status => 200, json => { result => 1, text => 'success'});
+    } else {
+        $self->render(status => 500, json => { result => 0, text => 'Failed to update controller:' . $dbh->errstr()});
+    }
+};
+
 get "/sensorgroups" => sub {
     my $self = shift;
     my $dbh  = _mysql_dbh($self, $config) or return;

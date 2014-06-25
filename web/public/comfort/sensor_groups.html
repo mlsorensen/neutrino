@@ -31,7 +31,7 @@
                 </ul>
             </div>
         </div>
-        <div id="sensorgroup-controllerbar" class="panel-heading clearfix">
+        <div id="sensorgroup-controllerbar" class="panel-heading clearfix hidden">
             <div style="float:left;padding:7px">
                 <table id="controllerbar-nametable">
                     <tr>
@@ -42,8 +42,11 @@
             <div style="float:left">
                 <div id="controllerbar-enabledropdown" class="dropdown hidden">
                     <a class="dropdown-toggle btn btn-default" data-toggle="dropdown" href="#">
-                        <b id="controllerbar-enable">off</b><b class="caret"></b>
+                        <b id="controllerbar-enable">off </b><b class="caret"></b>
                     </a>
+                    <ul id="controllerbar-enable-list" style="padding: 5px 10px 0;max-height:400px;overflow-y:scroll"
+                        class="dropdown-menu dropdown-meun-form" role="menu">
+                    </ul>
                 </div>
             </div>
             <div style="float:right">
@@ -55,6 +58,9 @@
                                 <a class="dropdown-toggle btn btn-default" data-toggle="dropdown" href="#">
                                     <b id="controllerbar-setpoint">x</b><b class="caret"></b>
                                 </a>
+                                <ul id="controllerbar-setpoint-list" style="padding: 5px 10px 0;max-height:400px;overflow-y:scroll"
+                                    class="dropdown-menu dropdown-meun-form" role="menu">
+                                </ul>
                             </div>
                         </td>
                     </tr>
@@ -69,6 +75,9 @@
                                 <a class="dropdown-toggle btn btn-default" data-toggle="dropdown" href="#">
                                     <b id="controllerbar-tolerance">x</b><b class="caret"></b>
                                 </a>
+                                <ul id="controllerbar-tolerance-list" style="padding: 5px 10px 0;max-height:400px;overflow-y:scroll"
+                                    class="dropdown-menu dropdown-meun-form" role="menu">
+                                </ul>
                             </div>
                         </td>
                     </tr>
@@ -83,6 +92,9 @@
                                 <a class="dropdown-toggle btn btn-default" data-toggle="dropdown" href="#">
                                     <b id="controllerbar-fanmode">x</b><b class="caret"></b>
                                 </a>
+                                <ul id="controllerbar-fanmode-list" style="padding: 5px 10px 0;max-height:400px;overflow-y:scroll"
+                                    class="dropdown-menu dropdown-meun-form" role="menu">
+                                </ul>
                             </div>
                         </td>
                     </tr>

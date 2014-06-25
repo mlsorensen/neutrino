@@ -119,6 +119,7 @@ $(document).on('DOMNodeInserted', function(event) {
             $.ajax({url: "/api/sensorgroups/" + sensorid,
                     type: 'DELETE',
                     success: function(data) {
+                        $(".sensorgroup.active > a")[0].remove();
                         getSensorGroups();
                     },
                     error: function(data) {
@@ -194,6 +195,13 @@ function renderSensorGroupGraph(sensorgroupid, targetdiv) {
     var templabel = 'Degrees ' + config.tempunits.value;
     var controllerid = sensorgroups[sensorgroupid].controller_id;
     var options = {};
+    console.log("rendering graph for sensor group " + sensorgroupid);
+
+    if (Object.keys(sensorgroups[sensorgroupid].members).length == 0) {
+        console.log("no sensors attached to group");
+        targetdiv.addClass('hidden');
+        return;
+    }
 
     if (controllerid == null || (controllerid != null && getLimitsAxis(controllerid) == 1 )) {
         for (var sensorid in sensorgroups[sensorgroupid].members) {
@@ -238,6 +246,7 @@ function renderSensorGroupGraph(sensorgroupid, targetdiv) {
         legend: {position:'sw'}
     };
 
+    targetdiv.removeClass('hidden'); 
     $.plot(targetdiv, dataset, options );
     targetdiv.css("background", "linear-gradient(to top, #ebebeb , white)");
 }
@@ -300,15 +309,16 @@ function populateSensorGroups(activesensorgroupid) {
 
     // empty out forms for new sensorgroup registration
     $("#addsensorgroup").on("click", function() {
-        //$("#comfort-sensor_groups").trigger("click");
         if ($(".active.sensorgroup") != undefined) {
             $(".active.sensorgroup").removeClass("active");
         }
-        $("#sensorgroup-name-input").val('enter group name');
+        $("#sensorgroup-name-input").val('');
         $("#sensorgroup-controllerselect-list").html('');
         $("#sensorgroup-sensorselect-list").html('');
         $("#sensorgroup-controllerselect-dropdown").addClass('hidden');
         $("#sensorgroup-sensorselect-dropdown").addClass('hidden');
+        $("#sensorgroup-controllerbar").addClass('hidden');
+        $("#sensorgroup-graph").addClass('hidden');
     });
 
     // populate info on selected sensor group 
@@ -321,6 +331,7 @@ function populateSensorGroups(activesensorgroupid) {
         $("#sensorgroup-name-input").val($(this).html());
 
         if (controller != undefined) {
+            $("#sensorgroup-controllerbar").removeClass('hidden');
             $("#controllerbar-name").html(controller.display_name + "&nbsp:");
             $("#controllerbar-setpoint").html(controller.setpoint + " ");
             $("#controllerbar-tolerance").html(controller.tolerance + " ");
@@ -345,18 +356,54 @@ function populateSensorGroups(activesensorgroupid) {
             $("#controllerbar-tolerancetable").removeClass("hidden");
             $("#controllerbar-fanmodetable").removeClass("hidden");
             $("#controllerbar-enabledropdown").removeClass("hidden");
+
+            // populate setpoint options
+            $("#controllerbar-setpoint-list").html('');
+            for (var i = 0; i < 100; i++) {
+                $("#controllerbar-setpoint-list").append("<li><a class='controllerbar-setpoint-item' href='#'>" + i + "</a></li>");
+            }
+            $("#controllerbar-setpoint-list > li > a").on("click", function(e) {
+                controllerSaveSetting(controller.id, $("#controllerbar-setpoint"), $(this).html(), "setpoint");
+            });
+
+            // populate tolerance options
+            $("#controllerbar-tolerance-list").html('');
+            for (var i = 2; i <= 10; i++) {
+                $("#controllerbar-tolerance-list").append("<li><a class='controllerbar-tolerance-item' href='#'>" + i + "</a></li>");
+            }
+            $("#controllerbar-tolerance-list > li > a").on("click", function(e) {
+                controllerSaveSetting(controller.id, $("#controllerbar-tolerance"), $(this).html(), "tolerance");
+            });
+
+            // populate fanmode options
+            $("#controllerbar-fanmode-list").html('');
+            $("#controllerbar-fanmode-list").append("<li><a class='controllerbar-fanmode-item' href='#'>auto</a></li>");
+            $("#controllerbar-fanmode-list").append("<li><a class='controllerbar-fanmode-item' href='#'>on</a></li>");
+            $("#controllerbar-fanmode-list > li > a").on("click", function(e) {
+                controllerSaveSetting(controller.id, $("#controllerbar-fanmode"), $(this).html(), "fan_mode");
+            });
+
+            // populate controller on/off options
+            $("#controllerbar-enable-list").html('');
+            $("#controllerbar-enable-list").append("<li><a class='controllerbar-enable-item' href='#'>on</a></li>");
+            $("#controllerbar-enable-list").append("<li><a class='controllerbar-enable-item' href='#'>off</a></li>");
+            $("#controllerbar-enable-list > li > a").on("click", function(e) {
+                controllerSaveSetting(controller.id, $("#controllerbar-enable"), $(this).html(), "enabled");
+            });
         } else {
-            $("#controllerbar-name").html("No controller attached");
+            $("#sensorgroup-controllerbar").addClass("hidden");
+            /*$("#controllerbar-name").html("No controller attached");
             $("#controllerbar-status").html("");
             $("#controllerbar-setpointtable").addClass("hidden");
             $("#controllerbar-tolerancetable").addClass("hidden");
             $("#controllerbar-fanmodetable").addClass("hidden");
             $("#controllerbar-enabledropdown").addClass("hidden");
+    */
         }
 
         // populate controller select dropdown
         $("#sensorgroup-controllerselect-dropdown").removeClass('hidden');
-        $("#sensorgroup-controllerbar").removeClass('hidden');
+        //$("#sensorgroup-controllerbar").removeClass('hidden');
         $("#sensorgroup-controllerselect-list").html('');
         $("#sensorgroup-controllerselect-list").append('<li><a id="0" class="sensorgroup-controllerlist" href="#">none</a></li>');
         for(var key in controllers) {
@@ -417,6 +464,25 @@ function populateSensorGroups(activesensorgroupid) {
     }
 }
 
+function controllerSaveSetting(controllerid, targetdiv, settingvalue, settingname) {
+    $.ajax({url: "/api/controllers/" + controllerid + "/" + settingname,
+            type: "POST",
+            data: {"value":settingvalue},
+            async: false,
+            success: function() {
+                targetdiv.html(settingvalue + " ");
+                targetdiv.notify("success","info", {autoHideDelay:1000});
+                controllers[controllerid][settingname] = settingvalue;
+                renderSensorGroupGraph($(".sensorgroup.active > a")[0].id, $("#sensorgroup-graph"));
+                return 1;
+            },
+            error: function() {
+                targetdiv.notify("Failed to save","error", {autoHideDelay:1000});
+                return 0;
+            } 
+    });
+}
+
 function assignControllerToSensorGroup(sensorgroupid, controllerid) {
     $.ajax({url: "/api/controllers/" + controllerid + "/sensorgroup",
             type: "POST",
@@ -425,14 +491,16 @@ function assignControllerToSensorGroup(sensorgroupid, controllerid) {
             success: function() {
                 if (controllerid == 0) {
                     $("#sensorgroup-controllerselect-dropdown").notify("removed", "info", {autoHideDelay:1000});
-                    $("#sensorgroup-controllerbar").html('no controller attached')
-                    sensorgroups[sensorgroupid].controller_id = null;
+                    $("#sensorgroup-controllerbar").addClass('hidden')
+                    sensorgroups[sensorgroupid].controller_id = undefined;
                 } else {
                     $("#sensorgroup-controllerselect-dropdown").notify("added", "info", {autoHideDelay:1000});
-                    $("#sensorgroup-controllerbar").html(controllers[controllerid].display_name);
+                    //$("#sensorgroup-controllerbar").html(controllers[controllerid].display_name);
+                    
                     sensorgroups[sensorgroupid].controller_id = controllerid;
                 }
-                renderSensorGroupGraph(sensorgroupid, $("#sensorgroup-graph"));
+                $(".sensorgroup > a#" + sensorgroupid).trigger("click");
+                //renderSensorGroupGraph(sensorgroupid, $("#sensorgroup-graph"));
                 getSensorGroups();
             },
             error: function(data) { 

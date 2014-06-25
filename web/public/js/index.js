@@ -82,6 +82,7 @@ function getSensorGroups() {
             sensorgroups = data.payload;
             if ($("#sensorgroup-nav-list") != undefined) {
                 if($(".sensorgroup.active > a")[0] != undefined) {
+                    console.log("rendering sensor groups with active group id " + $(".sensorgroup.active > a")[0].id);
                     populateSensorGroups($(".sensorgroup.active > a")[0].id);
                 } else {
                     var lastkey = 0;
@@ -90,6 +91,7 @@ function getSensorGroups() {
                             lastkey = key;
                         }
                     }
+                    console.log("rendering sensor groups, no active id found, using id " + key);
                     populateSensorGroups(key);
                 }
             }

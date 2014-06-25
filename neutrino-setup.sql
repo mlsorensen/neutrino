@@ -37,7 +37,7 @@ CREATE TABLE neutrino.controller (
   `type` enum('temperature','humidity') NOT NULL,
   `setpoint` float DEFAULT NULL,
   `tolerance` float NOT NULL DEFAULT 3,
-  `enabled` tinyint(3) unsigned,
+  `enabled` enum('on','off') NOT NULL DEFAULT 'off',
   `status` enum('heating','cooling','fan','idle') NOT NULL DEFAULT 'idle',
   `fan_mode` enum('on','auto') NOT NULL DEFAULT 'auto',
    PRIMARY KEY (`id`)
