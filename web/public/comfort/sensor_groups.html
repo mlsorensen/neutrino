@@ -31,8 +31,63 @@
                 </ul>
             </div>
         </div>
-        <div id="sensorgroup-controllerbar" class="panel-heading hidden clearfix">
-            no controller attached 
+        <div id="sensorgroup-controllerbar" class="panel-heading clearfix">
+            <div style="float:left;padding:7px">
+                <table id="controllerbar-nametable">
+                    <tr>
+                        <td id="controllerbar-name">none</td><td id="controllerbar-status"> </td>
+                    </tr>
+                </table>
+            </div>
+            <div style="float:left">
+                <div id="controllerbar-enabledropdown" class="dropdown hidden">
+                    <a class="dropdown-toggle btn btn-default" data-toggle="dropdown" href="#">
+                        <b id="controllerbar-enable">off</b><b class="caret"></b>
+                    </a>
+                </div>
+            </div>
+            <div style="float:right">
+                <table id="controllerbar-setpointtable" class="hidden">
+                    <tr>
+                        <td>Setpoint&nbsp:&nbsp</td>
+                        <td id="controllerbar-setpointbutton">
+                            <div id="controllerbar-setpointdropdown" class="dropdown">
+                                <a class="dropdown-toggle btn btn-default" data-toggle="dropdown" href="#">
+                                    <b id="controllerbar-setpoint">x</b><b class="caret"></b>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div style="float:right;padding-right:5px">
+                <table id="controllerbar-tolerancetable" class="hidden">
+                    <tr>
+                        <td>Tolerance&nbsp:&nbsp</td>
+                        <td id="controllerbar-tolerancebutton">
+                            <div id="controllerbar-tolerancedropdown" class="dropdown">
+                                <a class="dropdown-toggle btn btn-default" data-toggle="dropdown" href="#">
+                                    <b id="controllerbar-tolerance">x</b><b class="caret"></b>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div style="float:right;padding-right:5px">
+                <table id="controllerbar-fanmodetable" class="hidden">
+                    <tr>
+                        <td>Fan&nbsp:&nbsp</td>
+                        <td id="controllerbar-fanmodebutton">
+                            <div id="controllerbar-fanmodedropdown" class="dropdown">
+                                <a class="dropdown-toggle btn btn-default" data-toggle="dropdown" href="#">
+                                    <b id="controllerbar-fanmode">x</b><b class="caret"></b>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
         </div>
         <div id="sensorgroup-detail-inner" class="panel-body">
             <div id="sensorgroup-graph" style="width:600px;height:380px;"></div>

@@ -2,6 +2,35 @@
 // form controls //
 ///////////////////
 
+var colors = {
+    blue  : [],
+    red   : [],
+    green : []
+};
+
+for (i=1; i <= 5; i++) {
+    var o1  = (i * 40);
+    var o3  = 200 + (i * 10)
+
+    colors.blue.push(rgbToHex(o1, 200-o1, o3));
+    colors.blue.push(rgbToHex(200-o1, o1, o3));
+
+    colors.red.push(rgbToHex(o3, 200-o1, o1));
+    colors.red.push(rgbToHex(o3, o1, 200-o1));
+    
+    colors.green.push(rgbToHex(200-o1, o3, o1));
+    colors.green.push(rgbToHex(o1, o3, 200-o1));
+}
+
+function componentToHex(c) {
+    var hex = c.toString(16);
+    return hex.length == 1 ? "0" + hex : hex;
+}
+
+function rgbToHex(r, g, b) {
+    return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+}
+
 // populate page
 $(document).on('DOMNodeInserted', function(event) {
 
@@ -149,8 +178,8 @@ function renderSensorGraph(sensor, value, hours, targetdiv) {
             axisLabels: {show:true},
             series: {shadowSize:5, lines:{show:true},},
             xaxes: [{mode:"time", timezone: "browser", twelveHourClock: true}],
-            yaxes: [{alignTicksWithAxis:1, position:"right", axisLabel:templabel, autoscaleMargin:4},
-                    {alignTicksWithAxis:1, position:"left", axisLabel:humlabel}],
+            yaxes: [{alignTicksWithAxis:1, position:"right", axisLabel:templabel, autoscaleMargin:.3},
+                    {alignTicksWithAxis:1, position:"left", axisLabel:humlabel, autoscaleMargin:.3}],
             legend: {position:'sw'}
         };
 
@@ -163,55 +192,51 @@ function renderSensorGroupGraph(sensorgroupid, targetdiv) {
     var dataset = [];
     var humlabel = 'Humidity %';
     var templabel = 'Degrees ' + config.tempunits.value;
-
-    for (var sensorid in sensorgroups[sensorgroupid].members) {
-        var sensortempdata = getSensorData(sensorid, config.graphtime.value, "temperature");
-        dataset.push({data:sensortempdata, label: sensors[sensorid].display_name + " temp", color:"#0062E3", lines:{show:true}});
-    }
-
-    for (var sensorid in sensorgroups[sensorgroupid].members) {
-        var humiditydata = getSensorData(sensorid, config.graphtime.value, "humidity");
-        dataset.push({data:humiditydata, label:sensors[sensorid].display_name + " hum", color:"green", lines:{show:true}, yaxis:2});
-    }
-
     var controllerid = sensorgroups[sensorgroupid].controller_id;
     var options = {};
+
+    if (controllerid == null || (controllerid != null && getLimitsAxis(controllerid) == 1 )) {
+        for (var sensorid in sensorgroups[sensorgroupid].members) {
+            var sensortempdata = getSensorData(sensorid, config.graphtime.value, "temperature");
+            dataset.push({data:sensortempdata, label: sensors[sensorid].display_name + " temp", color:colors.blue[sensorid], lines:{show:true}});
+        }
+    }
+
+    if (controllerid == null || (controllerid != null && getLimitsAxis(controllerid) == 2 )) {
+        for (var sensorid in sensorgroups[sensorgroupid].members) {
+            var humiditydata = getSensorData(sensorid, config.graphtime.value, "humidity");
+            dataset.push({data:humiditydata, label:sensors[sensorid].display_name + " hum", color:colors.green[sensorid], lines:{show:true}, yaxis:2});
+        }
+    }
+
     if (controllerid != null && controllers[controllerid].setpoint != null) {
-        var start    = dataset[0].data[0][0]; 
+        var start    = dataset[0].data[0][0];
         var end      = dataset[0].data[dataset[0].data.length - 1][0];
         var setpoint = controllers[controllerid].setpoint;
         var upper    = parseFloat(setpoint) + parseFloat(controllers[controllerid].tolerance);
         var lower    = parseFloat(setpoint) - parseFloat(controllers[controllerid].tolerance);
-        dataset.push({data:[[end, upper],[start, upper],[start, lower],[end, lower]], 
-                      label:'setpoint', 
-                      color:"red", 
-                      lines:{show:true, 
-                             fill:true,
-                             lineWidth:1,
-                             fillColor: { colors: [{ opacity: 0.2 }, { opacity: 0.2 }]}
-                            },
-                              
+        dataset.push({data:[[start, upper],[end, upper]],
+                      label:'upper limit',
+                      color:"red",
+                      lines:{show:true,lineWidth:1},
                       yaxis: getLimitsAxis(controllerid)
                      });
-
-        options = {
-            axisLabels: {show:true},
-            series: {shadowSize:5, lines:{show:true},},
-            xaxes: [{mode:"time", timezone: "browser", twelveHourClock: true}],
-            yaxes: [{alignTicksWithAxis:1, position:"right", axisLabel:templabel, min:lower-5, max:upper+5 },
-                    {alignTicksWithAxis:1, position:"left", axisLabel:humlabel}],
-            legend: {position:'sw'}
-        };
-    } else {
-        options = {
-            axisLabels: {show:true},
-            series: {shadowSize:5, lines:{show:true},},
-            xaxes: [{mode:"time", timezone: "browser", twelveHourClock: true}],
-            yaxes: [{alignTicksWithAxis:1, position:"right", axisLabel:templabel },
-                    {alignTicksWithAxis:1, position:"left", axisLabel:humlabel}],
-            legend: {position:'sw'}
-        };
+        dataset.push({data:[[start, lower],[end, lower]],
+                      label:'lower limit',
+                      color:"red",
+                      lines:{show:true,lineWidth:1},
+                      yaxis: getLimitsAxis(controllerid)
+                     });
     }
+
+    var options = {
+        axisLabels: {show:true},
+        series: {shadowSize:5, lines:{show:true},},
+        xaxes: [{mode:"time", timezone: "browser", twelveHourClock: true}],
+        yaxes: [{alignTicksWithAxis:1, position:"right", axisLabel:templabel, autoscaleMargin:.3 },
+                {alignTicksWithAxis:1, position:"left", axisLabel:humlabel, autoscaleMargin:.3}],
+        legend: {position:'sw'}
+    };
 
     $.plot(targetdiv, dataset, options );
     targetdiv.css("background", "linear-gradient(to top, #ebebeb , white)");
@@ -296,9 +321,37 @@ function populateSensorGroups(activesensorgroupid) {
         $("#sensorgroup-name-input").val($(this).html());
 
         if (controller != undefined) {
-            $("#sensorgroup-controllerbar").html(controller.display_name);
+            $("#controllerbar-name").html(controller.display_name + "&nbsp:");
+            $("#controllerbar-setpoint").html(controller.setpoint + " ");
+            $("#controllerbar-tolerance").html(controller.tolerance + " ");
+            $("#controllerbar-fanmode").html(controller.fan_mode + " ");
+            if (controller.status == "idle") {
+                $("#controllerbar-status").html("<b style='color:green'>&nbsp idle</b>");
+            } else if (controller.status == "heating") {
+                $("#controllerbar-status").html("<b style='color:red'>&nbsp heating</b>");
+            } else if (controller.status == "cooling") {
+                $("#controllerbar-status").html("<b style='color:blue'>&nbsp cooling</b>");
+            } else if (controller.status == "humidifying") {
+                $("#controllerbar-status").html("<b style='color:dodgerblue'>&nbsp humidifying</b>");
+            }
+            if (controller.enabled == 1) {
+                $("#controllerbar-enabled").html("on ");
+            } else if (controller.enabled == 0) {
+                $("#controllerbar-enabled").html("off ");
+            } else {
+                $("#controllerbar-enabled").html("? ");
+            }
+            $("#controllerbar-setpointtable").removeClass("hidden");
+            $("#controllerbar-tolerancetable").removeClass("hidden");
+            $("#controllerbar-fanmodetable").removeClass("hidden");
+            $("#controllerbar-enabledropdown").removeClass("hidden");
         } else {
-            $("#sensorgroup-controllerbar").html("no controller attached");
+            $("#controllerbar-name").html("No controller attached");
+            $("#controllerbar-status").html("");
+            $("#controllerbar-setpointtable").addClass("hidden");
+            $("#controllerbar-tolerancetable").addClass("hidden");
+            $("#controllerbar-fanmodetable").addClass("hidden");
+            $("#controllerbar-enabledropdown").addClass("hidden");
         }
 
         // populate controller select dropdown
