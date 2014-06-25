@@ -227,7 +227,7 @@ get "/sensorgroups/:id/sensors" => sub {
                             "from sensor,sensor_tie where sensor_tie.sensor_id = sensor.id and sensor_tie.sensorgroup_id=$id");
     $sth->execute();
     if(!$dbh->errstr()) {
-        my $data = $sth->fetchall_arrayref({});
+        my $data = $sth->fetchall_hashref('id');
         $self->render(status => 200, json => { result => 1, payload => $data});
     } else {
         $self->render(status => 500, json => { result => 0, text => 'failed to query sensors for sensor group'});
@@ -311,7 +311,7 @@ get "/sensors/:id/data" => sub {
     my $dbh = _mysql_dbh($self, $config) or return;
     my $field = $value;
     $field = "voltage,pressure,humidity,temperature" if $field eq "all";
-    my $sth = $dbh->prepare("SELECT UNIX_TIMESTAMP(date) as epoch,date,id,sensor_address,$field from data where sensor_address=$id and date >= DATE_SUB(NOW(),INTERVAL $hours HOUR)");
+    my $sth = $dbh->prepare("SELECT UNIX_TIMESTAMP(date) as epoch,date,id,$field from data where sensor_id=$id and date >= DATE_SUB(NOW(),INTERVAL $hours HOUR)");
     $sth->execute();
     my $data = $sth->fetchall_arrayref({});
     $sth->finish();
@@ -339,7 +339,7 @@ post "/sensors/:id/name" => sub {
     }
 
     my $dbh = _mysql_dbh($self, $config) or return;
-    $dbh->do("UPDATE sensor set display_name=? where sensor_address=?", undef, $value, $id);
+    $dbh->do("UPDATE sensor set display_name=? where id=?", undef, $value, $id);
     if($dbh->errstr()) {
         $self->render(status => 500, json => { result => 0, text => 'failed to save value to database'});
     }

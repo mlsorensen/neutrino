@@ -84,6 +84,7 @@ function getSensorData(sensor, hours, datatype) {
     }).responseText);
 
     if (data.result) {
+    console.log(data);
         for (i = 0; i < data.payload.length; i++) {
             var element = [];
             element[0] = data.payload[i].epoch * 1000;
@@ -175,9 +176,9 @@ function getLimitsAxis(controllerid) {
 
 function populateSensors() {
     for (var key in sensors) {
-        var $row = "<li class='sensor'><a id='sensor " + sensors[key].sensor_address + "' href='#'>sensor " + sensors[key].sensor_address + "</a></li>";
+        var $row = "<li class='sensor'><a id='sensor " + key + "' href='#'>sensor " + key + "</a></li>";
         if (sensors[key].display_name != null) { 
-            var $row = "<li class='sensor'><a id='sensor " + sensors[key].sensor_address + "' href='#'>" + sensors[key].display_name + "</a></li>";
+            var $row = "<li class='sensor'><a id='sensor " + key + "' href='#'>" + sensors[key].display_name + "</a></li>";
         }
         $("#sensor-nav-list").append($row);
     }

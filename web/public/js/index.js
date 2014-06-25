@@ -54,6 +54,7 @@ function getSensors() {
     $.getJSON("/api/sensors", function (data) {
         if (data.result) {
             sensors = data.payload;
+            console.log(sensors);
         } else {
             $(".navbar-brand").notify(data.text, "error");
         }
