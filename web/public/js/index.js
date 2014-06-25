@@ -84,7 +84,13 @@ function getSensorGroups() {
                 if($(".sensorgroup.active > a")[0] != undefined) {
                     populateSensorGroups($(".sensorgroup.active > a")[0].id);
                 } else {
-                    populateSensorGroups();
+                    var lastkey = 0;
+                    for (var key in sensorgroups) {
+                        if (key > lastkey) {
+                            lastkey = key;
+                        }
+                    }
+                    populateSensorGroups(key);
                 }
             }
         } else {
