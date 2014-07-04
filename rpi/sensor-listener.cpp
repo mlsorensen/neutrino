@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
                 printf("Temperature is %.2f F\n", ctof(w.tempc));
                 printf("Temperature is %.2f C\n", (float)w.tempc / 100);
                 printf("pressure is %d Pa\n", w.pressurep);
-		printf("humidity is %d %\n", w.humidity);
+		printf("humidity is %.2f%\n", (float)w.humidity / 100);
                 printf("voltage is %.3f \n", (float)w.millivolts / 1000);
                 printf("size of w is %lu\n", sizeof w);
 
@@ -134,8 +134,8 @@ int insert_neutrino_data(weather *w) {
     }
 
     // add data to data table
-    sprintf(sql,"insert into data (sensor_id, voltage, fahrenheit, celsius, pascals, humidity) values (%u,%.3f,%.2f,%.2f,%ld,%u);",
-                sensorid, (float)w->millivolts/1000, ctof(w->tempc) ,(float)w->tempc/100, (long)w->pressurep, (int)w->humidity);
+    sprintf(sql,"insert into data (sensor_id, voltage, fahrenheit, celsius, pascals, humidity) values (%u,%.3f,%.2f,%.2f,%ld,%.2f);",
+                sensorid, (float)w->millivolts/1000, ctof(w->tempc) ,(float)w->tempc/100, (long)w->pressurep, (float)w->humidity/100);
     if (mysql_query(conn, sql)) {
         fprintf(stderr, "SQL error on data insert: %s\n", mysql_error(conn));
         return -1;
@@ -252,7 +252,7 @@ bool publish_zabbix(weather *w) {
     key.str("");
     value.str("");
     key << "neutrino." << (int)w->addr << ".humidity";
-    value << (int)w->humidity;
+    value << std::fixed << std::setprecision(2) << (float)w->humidity/100;
     zabbix_send(key.str().c_str(), value.str().c_str());
     
 }
