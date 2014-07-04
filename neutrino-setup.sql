@@ -17,9 +17,10 @@ CREATE TABLE neutrino.data (
   `sensor_id` int(10) unsigned NOT NULL,
   `date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `voltage` float DEFAULT NULL,
-  `temperature` float DEFAULT NULL,
+  `fahrenheit` float DEFAULT NULL,
+  `celsius` float DEFAULT NULL,
   `humidity` float DEFAULT NULL,
-  `pressure` int(10) unsigned DEFAULT NULL,
+  `pascals` int(10) unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
   FOREIGN KEY (`sensor_id`) REFERENCES neutrino.sensor(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;

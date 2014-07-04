@@ -35,9 +35,9 @@ int payloadsize = 16;
 struct __attribute__((packed))
 weather {
     int8_t  addr;
-    int16_t tempf;
+    int16_t tempc;
+    int16_t humidity;
     int32_t pressurep;
-    int32_t altitude;
     int32_t millivolts;
 };
 
@@ -70,10 +70,11 @@ int main(int argc, char** argv) {
                 ostringstream value;
 
                 printf("radio at address %d :\n",w.addr);
-                printf("Temperature is %.2f Fht\n", (float)w.tempf/100);
+                printf("Temperature is %.2f F\n", (float)(w.tempc/100 - 32) * .5555;
+                printf("Temperature is %.2f C\n", (float)w.tempc / 100;
                 printf("pressure is %d Pa\n", w.pressurep);
-                printf("altitude is %.2f ft\n", (float)w.altitude/100);
-                printf("voltage is %.3f \n", (float)w.millivolts/1000);
+                printf("altitude is %.2f ft\n", (float)w.altitude / 100);
+                printf("voltage is %.3f \n", (float)w.millivolts / 1000);
                 printf("size of w is %lu\n", sizeof w);
 
                 if (strlen(zabbixserver) > 0 && strlen(zabbixclient) > 0) {
@@ -128,8 +129,8 @@ int insert_neutrino_data(weather *w) {
     }
 
     // add data to data table
-    sprintf(sql,"insert into data (sensor_id, voltage, temperature, pressure) values (%u,%.3f,%.2f,%ld);",
-                sensorid, (float)w->millivolts/1000, (float)w->tempf/100, (long)w->pressurep);
+    sprintf(sql,"insert into data (sensor_id, voltage, fahrenheit, celsius, pascals, humidity) values (%u,%.3f,%.2f,%ld);",
+                sensorid, (float)w->millivolts/1000, (float)(w->tempc/100 - 32) * .5555 ,(float)w->tempc/100, (long)w->pressurep, (int)w->humidity);
     if (mysql_query(conn, sql)) {
         fprintf(stderr, "SQL error on data insert: %s\n", mysql_error(conn));
         return -1;
@@ -221,8 +222,14 @@ bool publish_zabbix(weather *w) {
     ostringstream key;
     ostringstream value;
 
-    key << "neutrino." << (int)w->addr << ".temperature";
-    value << std::fixed << std::setprecision(2) << (float)w->tempf/100;
+    key << "neutrino." << (int)w->addr << ".temperature.fahrenheit";
+    value << std::fixed << std::setprecision(2) << (float)(w->tempc/100 - 32) * .5555;
+    zabbix_send(key.str().c_str(), value.str().c_str());
+
+    key.str("");
+    value.str("");
+    key << "neutrino." << (int)w->addr << ".temperature.fahrenheit";
+    value << std::fixed << std::setprecision(2) << (float)(w->tempc/100);;
     zabbix_send(key.str().c_str(), value.str().c_str());
 
     key.str("");
