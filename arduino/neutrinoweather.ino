@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include <bmp180.h>
+#include <SI7021.h>
 #include <SPI.h>
 #include "RF24.h"
 #include <string.h>
@@ -14,64 +15,80 @@ int myaddr = getMyAddr();
 
 struct weather {
     int8_t  addr = myaddr;
-    int16_t tempf;
-    int32_t pressurep;
-    int32_t altitudeft;
-    int32_t millivolts;
+    int16_t tempc = 0;
+    int16_t humidity = 0;
+    int32_t pressurep = 0;
+    int32_t millivolts = 0;
 };
 
 RF24 radio(8,9);
 const uint64_t pipe = 0xFCFCFCFC00LL + myaddr;
 //const uint64_t pipes[6] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL }; 
 BMP180 bsensor;
+SI7021 hsensor;
 
 void setup() {
-  // turn off analog comparator
-  ACSR = B10000000;
-  // turn off digital input buffers for analog pins
-  DIDR0 = DIDR0 | B00111111;
+    // turn off analog comparator
+    ACSR = B10000000;
+    // turn off digital input buffers for analog pins
+    DIDR0 = DIDR0 | B00111111;
     
-  // turn off brown-out enable in software
-  MCUCR = bit (BODS) | bit (BODSE);
-  MCUCR = bit (BODS); 
-  sleep_cpu ();
+    // turn off brown-out enable in software
+    MCUCR = bit (BODS) | bit (BODSE);
+    MCUCR = bit (BODS); 
+    sleep_cpu ();
   
-  pinMode(rfgoodled,OUTPUT);
-  pinMode(rfbadled,OUTPUT);
-  pinMode(lobattled,OUTPUT);
+    pinMode(rfgoodled,OUTPUT);
+    pinMode(rfbadled,OUTPUT);
+    pinMode(lobattled,OUTPUT);
   
-  //flash lights on boot
-  flash(rfgoodled);
-  LowPower.powerDown(SLEEP_120MS, ADC_OFF, BOD_OFF);
-  flash(rfbadled);
-  LowPower.powerDown(SLEEP_120MS, ADC_OFF, BOD_OFF);
-  flash(rfgoodled);
+    //flash lights on boot
+    flash(rfgoodled);
+    LowPower.powerDown(SLEEP_120MS, ADC_OFF, BOD_OFF);
+    flash(rfbadled);
+    LowPower.powerDown(SLEEP_120MS, ADC_OFF, BOD_OFF);
+    flash(rfgoodled);
   
-  //flash node address
-  LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF);
-  for (int i = 0 ; i < myaddr; i++) {
-      pulse(rfgoodled);   
-  }
+    //flash node address
+    LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF);
+    for (int i = 0 ; i < myaddr; i++) {
+        pulse(rfgoodled);   
+    }
   
-  radio.begin();
-  radio.setRetries(10,10);
-  radio.setPayloadSize(16);
-  radio.setChannel(0x4c);
-  radio.setDataRate(RF24_250KBPS);
-  radio.setPALevel(RF24_PA_MAX);
-  radio.openWritingPipe(pipe);
-  radio.startListening();
-  
-  bsensor.begin(1);
-  
+    radio.begin();
+    radio.setRetries(10,10);
+    radio.setPayloadSize(16);
+    radio.setChannel(0x4c);
+    radio.setDataRate(RF24_250KBPS);
+    radio.setPALevel(RF24_PA_MAX);
+    radio.openWritingPipe(pipe);
+    radio.startListening();
+    
+    hsensor.begin();
+    bsensor.begin(1);
 }
 
 void loop() {
     weather w;
-    w.millivolts  = readVcc();
-    w.tempf       = bsensor.tempF();
-    w.pressurep   = bsensor.pressurePa();
-    w.altitudeft  = bsensor.altitudeFt(w.pressurep);
+    // humidity, temp
+    if (hsensor.sensorExists()) {
+        si7021_env sidata = hsensor.getHumidityAndTemperature();
+        w.humidity        = sidata.humidityPercent;
+        w.tempc           = sidata.celsiusHundredths;
+    }
+    
+    // pressure
+    if (bsensor.sensorExists()) {
+        // fall back to bosch sensor for temperature if necessary
+        if(! hsensor.sensorExists()) {
+            w.tempc = bsensor.getCelsiusHundredths();
+        }
+        w.pressurep = bsensor.getPressurePascals();
+        
+    }
+    
+    // voltage
+    w.millivolts = readVcc();
     
     radio.powerUp();
     delay(2);
