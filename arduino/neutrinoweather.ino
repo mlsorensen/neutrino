@@ -73,7 +73,7 @@ void loop() {
     // humidity, temp
     if (hsensor.sensorExists()) {
         si7021_env sidata = hsensor.getHumidityAndTemperature();
-        w.humidity        = sidata.humidityPercent;
+        w.humidity        = sidata.humidityBasisPoints;
         w.tempc           = sidata.celsiusHundredths;
     }
     
