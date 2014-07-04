@@ -70,3 +70,7 @@ GRANT USAGE ON neutrino.* TO 'neutrino'@'localhost';
 DROP USER 'neutrino'@'localhost';
 GRANT ALL on neutrino.* to 'neutrino'@'localhost' IDENTIFIED BY 'electron14';
 FLUSH PRIVILEGES;
+
+INSERT INTO neutrino.configuration (name, value) VALUES ('location', 'Orem, UT');
+INSERT INTO neutrino.configuration (name, value) VALUES ('tempunits', 'Fahrenheit');
+INSERT INTO neutrino.configuration (name, value) VALUES ('graphtime', 1);
