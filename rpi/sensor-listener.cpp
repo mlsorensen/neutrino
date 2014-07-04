@@ -99,8 +99,7 @@ int main(int argc, char** argv) {
 }
 
 float ctof (int16_t c) {
-    c = (float)c / 100;
-    return c * 1.8 + 32;
+    return c * .018 + 32;
 }
 
 int insert_neutrino_data(weather *w) {
@@ -235,7 +234,7 @@ bool publish_zabbix(weather *w) {
     key.str("");
     value.str("");
     key << "neutrino." << (int)w->addr << ".temperature.celsius";
-    value << std::fixed << std::setprecision(2) << (float)(w->tempc/100);;
+    value << std::fixed << std::setprecision(2) << (float)w->tempc/100;
     zabbix_send(key.str().c_str(), value.str().c_str());
 
     key.str("");
@@ -248,6 +247,12 @@ bool publish_zabbix(weather *w) {
     value.str("");
     key << "neutrino." << (int)w->addr << ".voltage";
     value << std::fixed << std::setprecision(3) << (float)w->millivolts/1000;
+    zabbix_send(key.str().c_str(), value.str().c_str());
+
+    key.str("");
+    value.str("");
+    key << "neutrino." << (int)w->addr << ".humidity";
+    value << (int)w->humidity;
     zabbix_send(key.str().c_str(), value.str().c_str());
     
 }
