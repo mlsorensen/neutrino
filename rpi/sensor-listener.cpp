@@ -48,6 +48,7 @@ void usage();
 bool zabbix_send(const char * key, const char * value);
 bool publish_zabbix(weather *w);
 int insert_neutrino_data(weather *w);
+float ctof(int16_t c);
 unsigned int get_sensor_id(MYSQL *conn, int sensorid, int sensorhubid);
 
 int main(int argc, char** argv) {
@@ -70,10 +71,10 @@ int main(int argc, char** argv) {
                 ostringstream value;
 
                 printf("radio at address %d :\n",w.addr);
-                printf("Temperature is %.2f F\n", (float)(w.tempc/100 - 32) * .5555;
-                printf("Temperature is %.2f C\n", (float)w.tempc / 100;
+                printf("Temperature is %.2f F\n", ctof(w.tempc));
+                printf("Temperature is %.2f C\n", (float)w.tempc / 100);
                 printf("pressure is %d Pa\n", w.pressurep);
-                printf("altitude is %.2f ft\n", (float)w.altitude / 100);
+		printf("humidity is %d %\n", w.humidity);
                 printf("voltage is %.3f \n", (float)w.millivolts / 1000);
                 printf("size of w is %lu\n", sizeof w);
 
@@ -95,6 +96,11 @@ int main(int argc, char** argv) {
     }
 
     return 0;
+}
+
+float ctof (int16_t c) {
+    c = (float)c / 100;
+    return c * 1.8 + 32;
 }
 
 int insert_neutrino_data(weather *w) {
@@ -129,8 +135,8 @@ int insert_neutrino_data(weather *w) {
     }
 
     // add data to data table
-    sprintf(sql,"insert into data (sensor_id, voltage, fahrenheit, celsius, pascals, humidity) values (%u,%.3f,%.2f,%ld);",
-                sensorid, (float)w->millivolts/1000, (float)(w->tempc/100 - 32) * .5555 ,(float)w->tempc/100, (long)w->pressurep, (int)w->humidity);
+    sprintf(sql,"insert into data (sensor_id, voltage, fahrenheit, celsius, pascals, humidity) values (%u,%.3f,%.2f,%.2f,%ld,%u);",
+                sensorid, (float)w->millivolts/1000, ctof(w->tempc) ,(float)w->tempc/100, (long)w->pressurep, (int)w->humidity);
     if (mysql_query(conn, sql)) {
         fprintf(stderr, "SQL error on data insert: %s\n", mysql_error(conn));
         return -1;
@@ -223,12 +229,12 @@ bool publish_zabbix(weather *w) {
     ostringstream value;
 
     key << "neutrino." << (int)w->addr << ".temperature.fahrenheit";
-    value << std::fixed << std::setprecision(2) << (float)(w->tempc/100 - 32) * .5555;
+    value << std::fixed << std::setprecision(2) << ctof(w->tempc);
     zabbix_send(key.str().c_str(), value.str().c_str());
 
     key.str("");
     value.str("");
-    key << "neutrino." << (int)w->addr << ".temperature.fahrenheit";
+    key << "neutrino." << (int)w->addr << ".temperature.celsius";
     value << std::fixed << std::setprecision(2) << (float)(w->tempc/100);;
     zabbix_send(key.str().c_str(), value.str().c_str());
 
