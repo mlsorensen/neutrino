@@ -168,7 +168,7 @@ function getSensorData(sensor, hours, datatype) {
 }
 
 function renderSensorGraph(sensor, value, hours, targetdiv) {
-    var temperaturedata = getSensorData(sensor, hours, "temperature");
+    var temperaturedata = getSensorData(sensor, hours, config.tempunits.value);
     var humiditydata    = getSensorData(sensor, hours, "humidity");
     var templabel = 'Degrees ' + config.tempunits.value;
     var humlabel = 'Humidity % ';

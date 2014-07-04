@@ -328,7 +328,7 @@ get "/sensors/:id/data" => sub {
 
     $validation->input({'id' => $id, 'value' => $value, 'hours' => $hours});
     $validation->required('id')->like(qr/^\d+$/);
-    $validation->required('value')->in(qw(voltage temperature humidity pressure all));
+    $validation->required('value')->in(qw(voltage fahrenheit celsius humidity pascals all));
     $validation->required('hours')->size(1,720);
     if(! $validation->is_valid) {
         $self->render(status => 406, json => { result => 0, text => "a parameter($id,$value,$hours) provided did not match character validation"} );
