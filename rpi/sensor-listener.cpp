@@ -27,8 +27,12 @@ const char * mysqlpass;
 
 int sensorhubid;
 
-//nRF24L01+
-RF24 radio("/dev/spidev0.0",8000000 , 25);  //spi device, speed and CSN,only CSN is NEEDED in RPI
+//nRF24L01+, raspberry pi vs beaglebone black macros
+#if defined __ARM_ARCH_6__
+    RF24 radio("/dev/spidev0.0",8000000 , 25);
+#elif defined __ARM_ARCH_7A__
+    RF24 radio(115, 117);
+#endif
 uint64_t pipes[6];
 int payloadsize = 16;
 
