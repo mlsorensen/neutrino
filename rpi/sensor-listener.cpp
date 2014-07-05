@@ -15,7 +15,6 @@ const char version[]           = "0.1";
 const char progname[]          = "sensor-listener";
 
 // config
-Config cfg;
 const char * zabbixserver;
 const char * zabbixclient;
 int zabbixport;
@@ -78,7 +77,7 @@ int main(int argc, char** argv) {
                 printf("Temperature is %.2f F\n", ctof(w.tempc));
                 printf("Temperature is %.2f C\n", (float)w.tempc / 100);
                 printf("pressure is %d Pa\n", w.pressurep);
-		printf("humidity is %.2f%\n", (float)w.humidity / 100);
+                printf("humidity is %.2f%\n", (float)w.humidity / 100);
                 printf("voltage is %.3f \n", (float)w.millivolts / 1000);
                 printf("size of w is %lu\n", sizeof w);
 
@@ -268,6 +267,7 @@ void usage() {
 }
 
 void get_args(int argc, char *argv[]) {
+    Config cfg;
     int c;
     const char * configfile;
     while ((c = getopt (argc, argv, "hc:")) != -1){
@@ -297,16 +297,19 @@ void get_args(int argc, char *argv[]) {
         exit(1);
     }
 
-    mysqlserver = cfg.lookup("mysqlserver").c_str();
-    mysqldb     = cfg.lookup("mysqldb").c_str();
-    mysqluser   = cfg.lookup("mysqluser").c_str();
-    mysqlpass   = cfg.lookup("mysqlpass").c_str();
-
-    sensorhubid = atoi(cfg.lookup("sensorhubid").c_str());
-
-    zabbixserver = cfg.lookup("zabbixserver").c_str();
-    zabbixport   = atoi(cfg.lookup("zabbixport").c_str());
-    zabbixclient = cfg.lookup("zabbixclient").c_str();
+    try {
+        mysqlserver = cfg.lookup("mysqlserver").c_str();
+        mysqldb     = cfg.lookup("mysqldb").c_str();
+        mysqluser   = cfg.lookup("mysqluser").c_str();
+        mysqlpass   = cfg.lookup("mysqlpass").c_str();
+        sensorhubid = atoi(cfg.lookup("sensorhubid").c_str());
+        zabbixserver = cfg.lookup("zabbixserver").c_str();
+        zabbixport   = atoi(cfg.lookup("zabbixport").c_str());
+        zabbixclient = cfg.lookup("zabbixclient").c_str();
+    } catch (const SettingNotFoundException &settingexception) {
+        fprintf(stderr, "A setting was not found: %s -- set any unneeded options to ''\n", settingexception.getPath());
+        exit(1);
+    }
 
     printf("mysql server is '%s','%s'\n",cfg.lookup("mysqlserver").c_str(),mysqlserver);
 }
