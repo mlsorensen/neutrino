@@ -15,6 +15,7 @@ const char version[]           = "0.1";
 const char progname[]          = "sensor-listener";
 
 // config
+Config cfg;
 const char * zabbixserver;
 const char * zabbixclient;
 int zabbixport;
@@ -267,7 +268,6 @@ void usage() {
 }
 
 void get_args(int argc, char *argv[]) {
-    Config cfg;
     int c;
     const char * configfile;
     while ((c = getopt (argc, argv, "hc:")) != -1){
