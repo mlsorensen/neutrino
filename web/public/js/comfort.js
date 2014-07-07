@@ -205,7 +205,7 @@ function renderSensorGroupGraph(sensorgroupid, targetdiv) {
 
     if (controllerid == null || (controllerid != null && getLimitsAxis(controllerid) == 1 )) {
         for (var sensorid in sensorgroups[sensorgroupid].members) {
-            var sensortempdata = getSensorData(sensorid, config.graphtime.value, "temperature");
+            var sensortempdata = getSensorData(sensorid, config.graphtime.value, config.tempunits.value);
             dataset.push({data:sensortempdata, label: sensors[sensorid].display_name + " temp", color:colors.blue[sensorid], lines:{show:true}});
         }
     }
