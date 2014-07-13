@@ -5,7 +5,11 @@
 #include "RF24.h"
 #include <string.h>
 #include <avr/sleep.h>
+#include <avr/eeprom.h>
 #include <LowPower.h>
+
+#define EEPROM_KEY_ADDR 0x00
+#define EEPROM_KEY_SIZE 10
 
 int rfgoodled = 3;
 int rfbadled  = 4;
@@ -27,8 +31,17 @@ const uint64_t pipe = 0xFCFCFCFC00LL + myaddr;
 //const uint64_t pipes[6] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL }; 
 BMP180 bsensor;
 SI7021 hsensor;
+byte key[EEPROM_KEY_SIZE];
 
 void setup() {
+    // populate encryption key
+    eeprom_read_block((void*)&key, (const void*)EEPROM_KEY_ADDR, sizeof(key));
+    if (key_is_empty(key)) {
+        byte newkey[EEPROM_KEY_SIZE];
+        generate_key(key);
+        eeprom_write_block((const void*)&key, (void*)EEPROM_KEY_ADDR, EEPROM_KEY_SIZE);
+    }
+    
     // turn off analog comparator
     ACSR = B10000000;
     // turn off digital input buffers for analog pins
@@ -204,4 +217,20 @@ int getMyAddr() {
     digitalWrite(7, LOW);
     
     return result; 
+}
+
+bool key_is_empty(byte * key) {
+    for (int i = 0; i < EEPROM_KEY_SIZE; i++) {
+        if (key[i] != 0xff) {
+            return false;   
+        }
+    }
+    return true;
+}
+
+void generate_key(byte * key) {
+   randomSeed(analogRead(0));
+   for (int i = 0; i < EEPROM_KEY_SIZE; i++) {
+       key[i] = (unsigned char) random(0,255);  
+   } 
 }
