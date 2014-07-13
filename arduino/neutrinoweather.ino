@@ -12,6 +12,7 @@ int rfbadled  = 4;
 int lobattled = 2;
 
 int myaddr = getMyAddr();
+int32_t lastmillivolts = 0;
 
 struct weather {
     int8_t  addr = myaddr;
@@ -66,6 +67,7 @@ void setup() {
     
     hsensor.begin();
     bsensor.begin(1);
+    lastmillivolts = readVcc();
 }
 
 void loop() {
@@ -87,8 +89,8 @@ void loop() {
         
     }
     
-    // voltage
-    w.millivolts = readVcc();
+    // voltage was read after last radio send to get reading after high power draw
+    w.millivolts = lastmillivolts;
     
     radio.powerUp();
     delay(2);
@@ -99,6 +101,7 @@ void loop() {
     } else {
         flash(rfbadled); 
     }
+    lastmillivolts = readVcc();
     radio.startListening();
     radio.powerDown();
     
