@@ -17,7 +17,7 @@ all: $(PROG)
 	avr-objcopy -O ihex -R .eeprom $(PROG).elf $(PROG).hex
 	avr-size --mcu=$(MCU) --format=avr -C $(PROG).elf
 
-$(PROG): BMP180.o SI7021.o RF24.o LowPower.o arduino
+$(PROG): BMP180.o SI7021.o RF24.o LowPower.o arduino skipjack.o
 	$(CPP) -c $(PROG).cpp $(INCLUDE) $(DEFINE) $(EXTRA) -std=c++11
 
 RF24.o: SPI.o
@@ -44,6 +44,9 @@ LowPower.o:
 arduino:
 	$(CC) -c arduino-core/*.c $(INCLUDE) $(DEFINE) $(EXTRA)
 	$(CPP) -c arduino-core/*.cpp $(INCLUDE) $(DEFINE) $(EXTRA)
+
+skipjack.o:
+	$(CC) -c libs/skipjack/skipjack.c $(INCLUDE) $(DEFINE) $(EXTRA)
 
 clean:
 	@if [ -e $(PROG).elf ]; then echo cleaning $(PROG).elf; rm -f $(PROG).elf; fi
