@@ -46,7 +46,9 @@ bool keyIsEmpty(byte * key);
 void generateKey(byte * key);
 
 int myaddr = getMyAddr();
-int mychannel = getMyChannel();
+// commented out until hardware supports channel pins
+// int mychannel = getMyChannel();
+int mychannel = 0;
 int32_t lastmillivolts = 0;
 
 // this struct should always be a multiple of 64 bits so we can easily encrypt it (skipjack 64bit blocks)
@@ -63,7 +65,7 @@ struct sensordata {
 // 28 bytes. Want to keep this <= 32 bytes so that it will fit in one radio packet
 struct message {
     int8_t addr = myaddr; // 1 byte
-    boolean encrypted = false; // 1 byte
+    bool encrypted = false; // 1 byte
     byte key[EEPROM_KEY_SIZE] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; // 10 bytes
     sensordata s; // 16 bytes
 };
@@ -112,7 +114,6 @@ void setup() {
   
     radio.begin();
     radio.setRetries(10,10);
-    radio.setPayloadSize(16);
     radio.setChannel(mychannel);
     radio.setDataRate(RF24_250KBPS);
     radio.setPALevel(RF24_PA_MAX);
@@ -155,7 +156,7 @@ void loop() {
             skipjack_enc((&m.s + ptrshift),&key);
         }
     } else {
-        memcpy((void*)&m.key, (void*)&key, EEPROM_KEY_SIZE * sizeof(byte));
+        memcpy((void*)&m.key, (void*)&key, EEPROM_KEY_SIZE);
     }
     
     radio.powerUp();
@@ -309,6 +310,8 @@ int getMyChannel() {
 }
 
 bool shouldEncrypt() {
+    return true;
+/* commented out until hardware supports encrypt pin
     boolean result = false;
     pinMode(ENCRYPT_PIN, INPUT_PULLUP);
     
@@ -319,7 +322,7 @@ bool shouldEncrypt() {
     pinMode(ENCRYPT_PIN, OUTPUT);
     digitalWrite(ENCRYPT_PIN, LOW);
     
-    return result;
+    return result;*/
 }
 
 bool keyIsEmpty(byte * key) {
@@ -332,7 +335,7 @@ bool keyIsEmpty(byte * key) {
 }
 
 void generateKey(byte * key) {
-   randomSeed(analogRead(0));
+   randomSeed(analogRead(A0));
    for (int i = 0; i < EEPROM_KEY_SIZE; i++) {
        key[i] = (unsigned char) random(0,255);  
    } 

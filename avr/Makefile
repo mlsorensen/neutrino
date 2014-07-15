@@ -9,53 +9,60 @@ DEFINE       = -DARDUINO=105 -D__AVR_ATmega328P__ -DF_CPU=8000000L -D__PROG_TYPE
 EXTRA        = -Os -mmcu=$(MCU) -fno-exceptions -ffunction-sections -fdata-sections -MMD
 AVRDUDE      = avrdude
 AVRDUDE_CONF = /etc/avrdude.conf
+BUILDDIR     = build
+$(shell if [ ! -e $(BUILDDIR) ]; then mkdir $(BUILDDIR); fi)
 
-all: $(PROG)
-	avr-ar rcs core.a *.o
-	$(CC) -Wl,--gc-sections -o $(PROG).elf core.a $(DEFINE) $(EXTRA)
-	avr-objcopy -O ihex -j .eeprom --set-section-flags=.eeprom=alloc,load --no-change-warnings --change-section-lma .eeprom=0 $(PROG).elf $(PROG).eep
-	avr-objcopy -O ihex -R .eeprom $(PROG).elf $(PROG).hex
-	avr-size --mcu=$(MCU) --format=avr -C $(PROG).elf
+ARDUINO_CPP  = $(shell basename `ls arduino-core/*.cpp`|cut -d. -f1)
+ARDUINO_C    = $(shell basename `ls arduino-core/*.c`|cut -d. -f1)
 
-$(PROG): BMP180.o SI7021.o RF24.o LowPower.o arduino skipjack.o
-	$(CPP) -c $(PROG).cpp $(INCLUDE) $(DEFINE) $(EXTRA) -std=c++11
+all: $(BUILDDIR)/$(PROG).o
+	avr-ar rcs $(BUILDDIR)/core.a $(BUILDDIR)/*.o
+	$(CC) -Wl,--gc-sections -o $(BUILDDIR)/$(PROG).elf $(BUILDDIR)/core.a $(DEFINE) $(EXTRA) $(INCLUDE)
+	avr-objcopy -O ihex -j .eeprom --set-section-flags=.eeprom=alloc,load --no-change-warnings --change-section-lma .eeprom=0 $(BUILDDIR)/$(PROG).elf $(BUILDDIR)/$(PROG).eep
+	avr-objcopy -O ihex -R .eeprom $(BUILDDIR)/$(PROG).elf $(BUILDDIR)/$(PROG).hex
+	avr-size --mcu=$(MCU) --format=avr -C $(BUILDDIR)/$(PROG).elf
 
-RF24.o: SPI.o
-	$(CPP) -c libs/RF24/RF24.cpp $(INCLUDE) $(DEFINE) $(EXTRA)
+$(BUILDDIR)/$(PROG).o: $(PROG).cpp $(patsubst %,$(BUILDDIR)/%.o, $(ARDUINO_CPP) $(ARDUINO_C) skipjack BMP180 SI7021 RF24 LowPower)
+	$(CPP) -c $(PROG).cpp -o $@ $(INCLUDE) $(DEFINE) $(EXTRA) -std=c++11
 
-SI7021.o: Wire.o
-	$(CPP) -c libs/SI7021/SI7021.cpp $(INCLUDE) $(DEFINE) $(EXTRA)
+$(BUILDDIR)/RF24.o: $(BUILDDIR)/SPI.o libs/RF24/RF24.cpp
+	$(CPP) -c libs/RF24/RF24.cpp -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
-BMP180.o: Wire.o
-	$(CPP) -c libs/BMP180/BMP180.cpp $(INCLUDE) $(DEFINE) $(EXTRA)
+$(BUILDDIR)/SI7021.o: $(BUILDDIR)/Wire.o libs/SI7021/SI7021.cpp
+	$(CPP) -c libs/SI7021/SI7021.cpp -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
-Wire.o: twi.o
-	$(CPP) -c libs/Wire/Wire.cpp $(INCLUDE) $(DEFINE) $(EXTRA)
+$(BUILDDIR)/BMP180.o: $(BUILDDIR)/Wire.o libs/BMP180/BMP180.cpp
+	$(CPP) -c libs/BMP180/BMP180.cpp -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
-twi.o:
-	$(CC) -c libs/twi/twi.c $(INCLUDE) $(DEFINE) $(EXTRA)
+$(BUILDDIR)/Wire.o: $(BUILDDIR)/twi.o libs/Wire/Wire.cpp
+	$(CPP) -c libs/Wire/Wire.cpp -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
-SPI.o:
-	$(CPP) -c libs/SPI/SPI.cpp $(INCLUDE) $(DEFINE) $(EXTRA)
+$(BUILDDIR)/twi.o: libs/twi/twi.c
+	$(CC) -c libs/twi/twi.c -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
-LowPower.o:
-	$(CPP) -c libs/LowPower/LowPower.cpp $(INCLUDE) $(DEFINE) $(EXTRA)
+$(BUILDDIR)/SPI.o: libs/SPI/SPI.cpp
+	$(CPP) -c libs/SPI/SPI.cpp -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
-arduino:
-	$(CC) -c arduino-core/*.c $(INCLUDE) $(DEFINE) $(EXTRA)
-	$(CPP) -c arduino-core/*.cpp $(INCLUDE) $(DEFINE) $(EXTRA)
+$(BUILDDIR)/LowPower.o: libs/LowPower/LowPower.cpp
+	$(CPP) -c libs/LowPower/LowPower.cpp -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
-skipjack.o:
-	$(CC) -c libs/skipjack/skipjack.c $(INCLUDE) $(DEFINE) $(EXTRA)
+$(BUILDDIR)/%.o: arduino-core/%.cpp
+	$(CPP) -c $< -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
+
+$(BUILDDIR)/%.o: arduino-core/%.c
+	$(CC) -c $< -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
+
+$(BUILDDIR)/skipjack.o: libs/skipjack/skipjack.c
+	$(CC) -c libs/skipjack/skipjack.c -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
 clean:
-	@if [ -e $(PROG).elf ]; then echo cleaning $(PROG).elf; rm -f $(PROG).elf; fi
-	@if [ -e $(PROG).hex ]; then echo cleaning $(PROG).hex; rm -f $(PROG).hex; fi
-	@if [ -e $(PROG).eep ]; then echo cleaning $(PROG).eep; rm -f $(PROG).eep; fi
-	@if [ -e core.a ]; then echo cleaning core.a; rm -f core.a; fi
-	@find . -name "*.o" -exec echo cleaning {} \; -exec rm -f {} \;
-	@find . -name "*.d" -exec echo cleaning {} \; -exec rm -f {} \;
+	@if [ -e build ]; then echo cleaning build dir; rm -rf build; fi
 
 install: all
 	@echo !!! flashing AVR !!!
-	$(AVRDUDE) -C$(AVRDUDE_CONF) -v -v -v -v -p$(MCU) -cusbasp -Pusb -Uflash:w:$(PROG).hex:i
+	$(AVRDUDE) -C$(AVRDUDE_CONF) -v -v -v -v -p$(MCU) -cusbasp -Pusb -Uflash:w:$(BUILDDIR)/$(PROG).hex:i
+
+installdev: all
+	@echo !!! flashing AVR !!!
+	$(AVRDUDE) -C$(AVRDUDE_CONF) -v -v -v -v -p$(MCU) -cusbasp -Pusb -Uflash:w:$(BUILDDIR)/$(PROG).hex:i -U eeprom:w:0xa0,0xa1,0xa2,0xa3,0xa4,0xa5,0xa6,0xa7,0xa8,0xa9:m
+	#$(AVRDUDE) -C$(AVRDUDE_CONF) -v -v -v -v -p$(MCU) -cusbasp -Pusb -U eeprom:w:0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39:m
