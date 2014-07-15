@@ -7,8 +7,8 @@ MCU          = atmega328p
 PROG         = neutrinosensor
 DEFINE       = -DARDUINO=105 -D__AVR_ATmega328P__ -DF_CPU=8000000L -D__PROG_TYPES_COMPAT__
 EXTRA        = -Os -mmcu=$(MCU) -fno-exceptions -ffunction-sections -fdata-sections -MMD
-AVRDUDE      = /usr/share/arduino/hardware/tools/avrdude
-AVRDUDE_CONF = /usr/share/arduino/hardware/tools/avrdude.conf
+AVRDUDE      = avrdude
+AVRDUDE_CONF = /etc/avrdude.conf
 
 all: $(PROG)
 	avr-ar rcs core.a *.o
