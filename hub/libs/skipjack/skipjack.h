@@ -16,8 +16,8 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-//#ifndef SKIPJACK_H_
-//#define SKIPJACK_H_
+#ifndef SKIPJACK_H_
+#define SKIPJACK_H_
 
 /** 
  * \file      skipjack.h
@@ -40,7 +40,13 @@
  * \param block pointer to the 64 bit (8 byte) block to encrypt
  * \param key   pointer to the 80 bit (10 byte) key 
  */
+#if defined (__cplusplus)
+extern "C" {
+#endif
 void skipjack_enc(void *block, void *key);
+#if defined (__cplusplus)
+}
+#endif
 
 /** \fn void skipjack_dec(void *block, void *key)
  * \brief skipjack decryption function
@@ -51,6 +57,12 @@ void skipjack_enc(void *block, void *key);
  * \param block pointer to the 64 bit (8 byte) block to decrypt
  * \param key   pointer to the 80 bit (10 byte) key 
  */
+#if defined (__cplusplus)
+extern "C" {
+#endif
 void skipjack_dec(void *block, void *key);
+#if defined (__cplusplus)
+}
+#endif
 
-//#endif /*SKIPJACK_H_*/
+#endif /*SKIPJACK_H_*/

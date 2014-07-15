@@ -5,27 +5,29 @@ LIBINC     = $(shell for i in `ls libs`; do echo -I libs/$$i; done)
 MYSQLFLAGS = $(shell mysql_config --cflags)
 MYSQLLIBS  = $(shell mysql_config --libs)
 PROG       = sensor-listener
+BUILDDIR   = build
+$(shell if [ ! -e $(BUILDDIR) ]; then mkdir $(BUILDDIR); fi)
 
 all: $(PROG)
 
-sensor-listener: skipjack.o RF24.o gpio.o spi.o compatibility.o
-	$(CPP) $(CFLAGS) -o $(PROG) $(PROG).cpp *.o $(MYSQLFLAGS) $(MYSQLLIBS) $(LIBINC) -lconfig++
+sensor-listener: sensor-listener.cpp $(patsubst %,$(BUILDDIR)/%.o, skipjack RF24 gpio spi compatibility)
+	$(CPP) $(CFLAGS) -o $(PROG) $(PROG).cpp $(BUILDDIR)/*.o $(LIBINC)  $(MYSQLFLAGS) $(MYSQLLIBS) -lconfig++
 
-skipjack.o:
-	$(CC) $(CFLAGS) -c libs/skipjack/skipjack.c $(LIBINC)
+$(BUILDDIR)/skipjack.o: libs/skipjack/skipjack.c
+	$(CC) $(CFLAGS) -c libs/skipjack/skipjack.c -o $@ $(LIBINC)
 
-RF24.o: 
-	$(CPP) $(CFLAGS) -c libs/RF24/RF24.cpp $(LIBINC)
+$(BUILDDIR)/RF24.o: libs/RF24/RF24.cpp
+	$(CPP) $(CFLAGS) -c libs/RF24/RF24.cpp -o $@ $(LIBINC)
 
-gpio.o:
-	$(CPP) $(CFLAGS) -c libs/gpio/gpio.cpp $(LIBINC)
+$(BUILDDIR)/gpio.o: libs/gpio/gpio.cpp
+	$(CPP) $(CFLAGS) -c libs/gpio/gpio.cpp -o $@ $(LIBINC)
 
-spi.o:
-	$(CPP) $(CFLAGS) -c libs/spi/spi.cpp $(LIBINC)
+$(BUILDDIR)/spi.o: libs/spi/spi.cpp
+	$(CPP) $(CFLAGS) -c libs/spi/spi.cpp -o $@ $(LIBINC)
 
-compatibility.o:
-	$(CC) $(CFLAGS) -c libs/compatibility/compatibility.c $(LIBINC)
+$(BUILDDIR)/compatibility.o: libs/compatibility/compatibility.c
+	$(CC) $(CFLAGS) -c libs/compatibility/compatibility.c -o $@ $(LIBINC)
 
 clean:
 	@if [ -e $(PROG) ]; then echo cleaning $(PROG); rm -f $(PROG); fi
-	@find . -name "*.o" -exec echo cleaning {} \; -exec rm -f {} \;
+	@if [ -e $(BUILDDIR) ]; then echo cleaning $(BUILDDIR); rm -rf $(BUILDDIR); fi

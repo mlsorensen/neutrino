@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <mysql.h>
 #include <libconfig.h++>
-#include "RF24.h"
+#include <RF24.h>
 #include <skipjack.h>
 
 #define SKIPJACK_KEY_SIZE 10
@@ -37,7 +37,6 @@ int sensorhubid;
     RF24 radio(115, 117);
 #endif
 uint64_t pipes[6];
-int payloadsize = 16;
 
 // this struct should always be a multiple of 64 bits so we can easily encrypt it (skipjack 64bit blocks)
 struct __attribute__((packed))
@@ -51,7 +50,7 @@ sensordata {
     int32_t millivolts;
 };
 
-//28 bytes. Want to keep this <= 32 bytes so that it will fit in one radio message
+// struct message = 28 bytes. Want to keep this <= 32 bytes so that it will fit in one radio message
 struct message {
     int8_t addr;
     bool encrypted;
@@ -67,6 +66,8 @@ bool zabbix_send(const char * key, const char * value);
 bool publish_zabbix(message *m);
 int insert_neutrino_data(message *m);
 float ctof(int16_t c);
+bool decrypt_sensordata(message *m);
+bool encryption_key_is_empty(char * key);
 unsigned int get_sensor_id(MYSQL *conn, int sensorid, int sensorhubid);
 
 int main(int argc, char** argv) {
@@ -83,12 +84,22 @@ int main(int argc, char** argv) {
     while(1) {
         if (radio.available()) {
             message m;
+            bzero(m.key, SKIPJACK_KEY_SIZE);
             bool nread = radio.read(&m, sizeof m);
             if(nread) {
                 ostringstream key;
                 ostringstream value;
 
+                if(m.encrypted  == true && decrypt_sensordata(&m) == false) {
+                    if (decrypt_sensordata(&m) == false || m.key == 0x00) {
+                        printf("message from sensor address %d was encrypted and unable to decrypt\n", m.addr);
+                        continue;
+                    }
+                }
+
                 printf("radio at address %d :\n",m.addr);
+                printf("encryption key is %s\n",m.key);
+                printf("encryption is %s\n", m.encrypted ? "true" : "false");
                 printf("Temperature is %.2f F\n", ctof(m.s.tempc));
                 printf("Temperature is %.2f C\n", (float)m.s.tempc / 100);
                 printf("pressure is %d Pa\n", m.s.pressurep);
@@ -120,12 +131,56 @@ float ctof (int16_t c) {
     return c * .018 + 32;
 }
 
+bool decrypt_sensordata(message *m) {
+    // look up encryption key in db
+    char sql[256];
+    MYSQL *conn;
+
+    conn = mysql_init(NULL);
+    if (!mysql_real_connect(conn, mysqlserver, mysqluser, mysqlpass, mysqldb, 0, NULL, 0)) {
+        fprintf(stderr, "Cant connect to database: %s\n", mysql_error(conn));
+        exit(1);
+    } else {
+        fprintf(stdout, "Connected to database\n");
+    }
+
+    sprintf(sql,"SELECT sensor_encryption_key from sensor where sensor_address=%d and sensor_hub_id=%d", m->addr, sensorhubid);
+    if(mysql_query(conn, sql)) {
+        fprintf(stderr, "SQL error on sensor encryption key lookup: %s\n", mysql_error(conn));
+        return false;
+    }
+    bzero(sql, 256);
+
+    MYSQL_RES *result = mysql_store_result(conn);
+    if (result == NULL) {
+        fprintf(stderr, "could not fetch sensor id from db: %s\n", mysql_error(conn));
+        mysql_free_result(result);
+        return false;
+    }
+
+    MYSQL_ROW row;
+    row = mysql_fetch_row(result);
+    mysql_free_result(result);
+
+    if (row == NULL) {
+        fprintf(stderr, "no result when looking up sensor encryption key\n");
+        return false;
+    }
+
+    fprintf(stderr, "found key %s in database\n", row[0]);
+
+    // decrypt memory blocks containing sensor data. skipjack is 64 bit (8 byte) blocks
+    for (int i = 0; i < sizeof(m->s); i += 8) {
+        int ptrshift = i * 8;
+        skipjack_dec((&m->s + ptrshift), row[0]);
+    }
+    return true;
+}
+
 int insert_neutrino_data(message *m) {
     char sql[256];
     int resultcode  = 0;
     unsigned int sensorid = 0;
-    MYSQL_RES *res_set;
-    MYSQL_ROW row;
     MYSQL *conn;
 
     // open database, do this every time so that we reconnect in case of intermittent db outage
@@ -138,7 +193,7 @@ int insert_neutrino_data(message *m) {
     }
 
     // ensure sensor is in sensor table
-    sprintf(sql,"INSERT IGNORE INTO sensor (sensor_address,sensor_hub_id) VALUES (%d, %d)", m->addr, sensorhubid);
+    sprintf(sql,"INSERT IGNORE INTO sensor (sensor_address,sensor_hub_id,sensor_encryption_key) VALUES (%d, %d, '%s')", m->addr, sensorhubid, m->key);
     if (mysql_query(conn, sql)) {
         fprintf(stderr, "SQL error on sensor insert: %s\n", mysql_error(conn));
         return -1;
@@ -176,6 +231,7 @@ unsigned int get_sensor_id(MYSQL *conn, int sensor_addr, int sensor_hub_id) {
 
     if (result == NULL) {
         fprintf(stderr, "could not fetch sensor id from db: %s\n", mysql_error(conn));
+        mysql_free_result(result);
         return 0;
     }
 
@@ -191,7 +247,6 @@ void radio_init() {
     radio.begin();
     radio.setChannel(sensorhubid);
     radio.setPALevel(RF24_PA_MAX);
-    radio.setPayloadSize(payloadsize);
     radio.setDataRate(RF24_250KBPS);
     radio.setRetries(30,30);
 
@@ -261,13 +316,13 @@ bool publish_zabbix(message *m) {
 
     key.str("");
     value.str("");
-    key << "neutrino." << (int)m->s.addr << ".voltage";
+    key << "neutrino." << (int)m->addr << ".voltage";
     value << std::fixed << std::setprecision(3) << (float)m->s.millivolts/1000;
     zabbix_send(key.str().c_str(), value.str().c_str());
 
     key.str("");
     value.str("");
-    key << "neutrino." << (int)m->s.addr << ".humidity";
+    key << "neutrino." << (int)m->addr << ".humidity";
     value << std::fixed << std::setprecision(2) << (float)m->s.humidity/100;
     zabbix_send(key.str().c_str(), value.str().c_str());
     

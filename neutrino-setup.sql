@@ -8,6 +8,7 @@ CREATE TABLE neutrino.sensor (
   `sensor_group` tinyint(3) unsigned DEFAULT NULL,
   `drives_hvac` tinyint(3) unsigned DEFAULT '0',
   `sensor_hub_id` tinyint(3) unsigned NOT NULL,
+  `sensor_encryption_key` binary(10) DEFAULT NULL,
   UNIQUE `unique_index`(`sensor_address`,`sensor_hub_id`),
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
