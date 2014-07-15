@@ -8,6 +8,9 @@
 #include <mysql.h>
 #include <libconfig.h++>
 #include "RF24.h"
+#include <skipjack.h>
+
+#define SKIPJACK_KEY_SIZE 10
 
 using namespace libconfig;
 
@@ -36,13 +39,24 @@ int sensorhubid;
 uint64_t pipes[6];
 int payloadsize = 16;
 
+// this struct should always be a multiple of 64 bits so we can easily encrypt it (skipjack 64bit blocks)
 struct __attribute__((packed))
-weather {
+sensordata {
     int8_t  addr;
+    int8_t  placeholder1;
     int16_t tempc;
     int16_t humidity;
+    int16_t placeholder2;
     int32_t pressurep;
     int32_t millivolts;
+};
+
+//28 bytes. Want to keep this <= 32 bytes so that it will fit in one radio message
+struct message {
+    int8_t addr;
+    bool encrypted;
+    char key[SKIPJACK_KEY_SIZE];
+    sensordata s;
 };
 
 //prototypes
@@ -50,8 +64,8 @@ void radio_init();
 void get_args(int argc, char *argv[]);
 void usage();
 bool zabbix_send(const char * key, const char * value);
-bool publish_zabbix(weather *w);
-int insert_neutrino_data(weather *w);
+bool publish_zabbix(message *m);
+int insert_neutrino_data(message *m);
 float ctof(int16_t c);
 unsigned int get_sensor_id(MYSQL *conn, int sensorid, int sensorhubid);
 
@@ -68,26 +82,26 @@ int main(int argc, char** argv) {
 
     while(1) {
         if (radio.available()) {
-            weather w;
-            bool nread = radio.read(&w, sizeof w);
+            message m;
+            bool nread = radio.read(&m, sizeof m);
             if(nread) {
                 ostringstream key;
                 ostringstream value;
 
-                printf("radio at address %d :\n",w.addr);
-                printf("Temperature is %.2f F\n", ctof(w.tempc));
-                printf("Temperature is %.2f C\n", (float)w.tempc / 100);
-                printf("pressure is %d Pa\n", w.pressurep);
-                printf("humidity is %.2f%\n", (float)w.humidity / 100);
-                printf("voltage is %.3f \n", (float)w.millivolts / 1000);
-                printf("size of w is %lu\n", sizeof w);
+                printf("radio at address %d :\n",m.addr);
+                printf("Temperature is %.2f F\n", ctof(m.s.tempc));
+                printf("Temperature is %.2f C\n", (float)m.s.tempc / 100);
+                printf("pressure is %d Pa\n", m.s.pressurep);
+                printf("humidity is %.2f%\n", (float)m.s.humidity / 100);
+                printf("voltage is %.3f \n", (float)m.s.millivolts / 1000);
+                printf("size of w is %lu\n", sizeof m);
 
                 if (strlen(zabbixserver) > 0 && strlen(zabbixclient) > 0) {
-                    publish_zabbix(&w);
+                    publish_zabbix(&m);
                 }
 
-                if (insert_neutrino_data(&w) == 0) {
-                    fprintf(stderr, "inserted data for node %d, sensorhub %d into db\n", w.addr, sensorhubid);
+                if (insert_neutrino_data(&m) == 0) {
+                    fprintf(stderr, "inserted data for node %d, sensorhub %d into db\n", m.addr, sensorhubid);
                 }
             } else {
                 printf("!!!!!!\n failed to read from radio\n !!!!!!\n");
@@ -106,7 +120,7 @@ float ctof (int16_t c) {
     return c * .018 + 32;
 }
 
-int insert_neutrino_data(weather *w) {
+int insert_neutrino_data(message *m) {
     char sql[256];
     int resultcode  = 0;
     unsigned int sensorid = 0;
@@ -124,7 +138,7 @@ int insert_neutrino_data(weather *w) {
     }
 
     // ensure sensor is in sensor table
-    sprintf(sql,"INSERT IGNORE INTO sensor (sensor_address,sensor_hub_id) VALUES (%d, %d)", w->addr, sensorhubid);
+    sprintf(sql,"INSERT IGNORE INTO sensor (sensor_address,sensor_hub_id) VALUES (%d, %d)", m->addr, sensorhubid);
     if (mysql_query(conn, sql)) {
         fprintf(stderr, "SQL error on sensor insert: %s\n", mysql_error(conn));
         return -1;
@@ -132,14 +146,14 @@ int insert_neutrino_data(weather *w) {
     bzero(sql, 256);
 
     // get sensor's db id
-    sensorid = get_sensor_id(conn, w->addr, sensorhubid);
+    sensorid = get_sensor_id(conn, m->addr, sensorhubid);
     if (sensorid == 0) {
         return -1;
     }
 
     // add data to data table
     sprintf(sql,"insert into data (sensor_id, voltage, fahrenheit, celsius, pascals, humidity) values (%u,%.3f,%.2f,%.2f,%ld,%.2f);",
-                sensorid, (float)w->millivolts/1000, ctof(w->tempc) ,(float)w->tempc/100, (long)w->pressurep, (float)w->humidity/100);
+                sensorid, (float)m->s.millivolts/1000, ctof(m->s.tempc) ,(float)m->s.tempc/100, (long)m->s.pressurep, (float)m->s.humidity/100);
     if (mysql_query(conn, sql)) {
         fprintf(stderr, "SQL error on data insert: %s\n", mysql_error(conn));
         return -1;
@@ -174,10 +188,8 @@ unsigned int get_sensor_id(MYSQL *conn, int sensor_addr, int sensor_hub_id) {
 }
 
 void radio_init() {
-    uint16_t channel = 0x4c;
-    channel += (sensorhubid * 4); // separate the channels a bit
     radio.begin();
-    radio.setChannel(channel);
+    radio.setChannel(sensorhubid);
     radio.setPALevel(RF24_PA_MAX);
     radio.setPayloadSize(payloadsize);
     radio.setDataRate(RF24_250KBPS);
@@ -227,36 +239,36 @@ bool zabbix_send(const char * key, const char * value) {
     close(sockfd);
 }
 
-bool publish_zabbix(weather *w) {
+bool publish_zabbix(message *m) {
     ostringstream key;
     ostringstream value;
 
-    key << "neutrino." << (int)w->addr << ".temperature.fahrenheit";
-    value << std::fixed << std::setprecision(2) << ctof(w->tempc);
+    key << "neutrino." << (int)m->addr << ".temperature.fahrenheit";
+    value << std::fixed << std::setprecision(2) << ctof(m->s.tempc);
     zabbix_send(key.str().c_str(), value.str().c_str());
 
     key.str("");
     value.str("");
-    key << "neutrino." << (int)w->addr << ".temperature.celsius";
-    value << std::fixed << std::setprecision(2) << (float)w->tempc/100;
+    key << "neutrino." << (int)m->addr << ".temperature.celsius";
+    value << std::fixed << std::setprecision(2) << (float)m->s.tempc/100;
     zabbix_send(key.str().c_str(), value.str().c_str());
 
     key.str("");
     value.str("");
-    key << "neutrino." << (int)w->addr << ".pressure";
-    value << (long)w->pressurep;
+    key << "neutrino." << (int)m->addr << ".pressure";
+    value << (long)m->s.pressurep;
     zabbix_send(key.str().c_str(), value.str().c_str());
 
     key.str("");
     value.str("");
-    key << "neutrino." << (int)w->addr << ".voltage";
-    value << std::fixed << std::setprecision(3) << (float)w->millivolts/1000;
+    key << "neutrino." << (int)m->s.addr << ".voltage";
+    value << std::fixed << std::setprecision(3) << (float)m->s.millivolts/1000;
     zabbix_send(key.str().c_str(), value.str().c_str());
 
     key.str("");
     value.str("");
-    key << "neutrino." << (int)w->addr << ".humidity";
-    value << std::fixed << std::setprecision(2) << (float)w->humidity/100;
+    key << "neutrino." << (int)m->s.addr << ".humidity";
+    value << std::fixed << std::setprecision(2) << (float)m->s.humidity/100;
     zabbix_send(key.str().c_str(), value.str().c_str());
     
 }
