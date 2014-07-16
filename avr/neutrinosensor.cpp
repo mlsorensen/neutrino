@@ -10,8 +10,10 @@
 #include <LowPower.h>
 #include <skipjack.h>
 
-#define EEPROM_KEY_ADDR 0x00
-#define EEPROM_KEY_SIZE 10
+#define EEPROM_ENC_KEY_ADDR 0x00
+#define EEPROM_ENC_KEY_SIZE 10
+#define EEPROM_SIG_KEY_ADDR 0x10
+#define EEPROM_SIG_KEY_SIZE 4
 
 #define CHANNEL_PIN_0 0
 #define CHANNEL_PIN_1 1
@@ -42,8 +44,8 @@ long readVcc();
 int getMyAddr();
 int getMyChannel();
 bool shouldEncrypt();
-bool keyIsEmpty(byte * key);
-void generateKey(byte * key);
+bool keyIsEmpty(byte * key, int size);
+void generateKey(byte * key, int size);
 
 int myaddr = getMyAddr();
 // commented out until hardware supports channel pins
@@ -52,21 +54,24 @@ int mychannel = 0;
 int32_t lastmillivolts = 0;
 
 // this struct should always be a multiple of 64 bits so we can easily encrypt it (skipjack 64bit blocks)
+// data is passed as integers, therefore decimals are shifted where noted to maintain precision
 struct sensordata {
-    int8_t  addr         = myaddr;
-    int8_t  placeholder1 = 0; // future var
-    int16_t tempc        = 0;
-    int16_t humidity     = 0;
-    int16_t placeholder2 = 0; // future var
-    int32_t pressurep    = 0;
-    int32_t millivolts   = 0;
+    int8_t   addr         = myaddr;
+    int8_t   placeholder1 = 0; // future var (door ajar?)
+    int8_t   placeholder2 = 0; // future var
+    int16_t  tempc        = 0; // temp in centicelsius
+    int16_t  humidity     = 0; // humidity in basis points (percent of percent)
+    uint16_t pressuredp   = 0; // pressure in decapascals
+    uint16_t millivolts   = 0; // battery voltage millivolts
+    byte signature[5]     = {0x00, 0x00, 0x00, 0x00, 0x00}; //truncated md5 of sensor data
 };
 
-// 28 bytes. Want to keep this <= 32 bytes so that it will fit in one radio packet
+// 32 bytes. Want to keep this <= 32 bytes so that it will fit in one radio packet
 struct message {
     int8_t addr = myaddr; // 1 byte
     bool encrypted = false; // 1 byte
-    byte key[EEPROM_KEY_SIZE] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; // 10 bytes
+    byte enckey[EEPROM_ENC_KEY_SIZE] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; // 10 bytes
+    byte sigkey[EEPROM_SIG_KEY_SIZE] = {0x00, 0x00, 0x00, 0x00}; // 4 bytes
     sensordata s; // 16 bytes
 };
 
@@ -75,14 +80,22 @@ const uint64_t pipe = 0xFCFCFCFC00LL + myaddr;
 //const uint64_t pipes[6] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL }; 
 BMP180 bsensor;
 SI7021 hsensor;
-byte key[EEPROM_KEY_SIZE];
+byte encryptionkey[EEPROM_ENC_KEY_SIZE];
+byte signaturekey[EEPROM_SIG_KEY_SIZE];
 
 void setup() {
     // populate encryption key
-    eeprom_read_block((void*)&key, (const void*)EEPROM_KEY_ADDR, sizeof(key));
-    if (keyIsEmpty(key)) {
-        generateKey(key);
-        eeprom_write_block((const void*)&key, (void*)EEPROM_KEY_ADDR, EEPROM_KEY_SIZE);
+    eeprom_read_block((void*)&encryptionkey, (const void*)EEPROM_ENC_KEY_ADDR, EEPROM_SIG_KEY_SIZE);
+    if (keyIsEmpty(encryptionkey, EEPROM_ENC_KEY_SIZE)) {
+        generateKey(encryptionkey, EEPROM_ENC_KEY_SIZE);
+        eeprom_write_block((const void*)&encryptionkey, (void*)EEPROM_ENC_KEY_ADDR, EEPROM_ENC_KEY_SIZE);
+    }
+
+    // populate signature key
+    eeprom_read_block((void*)&signaturekey, (const void*)EEPROM_SIG_KEY_ADDR, EEPROM_SIG_KEY_SIZE);
+    if (keyIsEmpty(signaturekey, EEPROM_SIG_KEY_SIZE)) {
+        generateKey(signaturekey, EEPROM_SIG_KEY_SIZE);
+        eeprom_write_block((const void*)&signaturekey, (void*)EEPROM_SIG_KEY_ADDR, EEPROM_SIG_KEY_SIZE);
     }
     
     // turn off analog comparator
@@ -140,7 +153,7 @@ void loop() {
         if(! hsensor.sensorExists()) {
             m.s.tempc = bsensor.getCelsiusHundredths();
         }
-        m.s.pressurep = bsensor.getPressurePascals();
+        m.s.pressuredp = bsensor.getPressurePascals() / 10;
         
     }
     
@@ -153,10 +166,10 @@ void loop() {
         // encrypt memory blocks containing sensor data. skipjack is 64 bit (8 byte) blocks
         for (int i = 0; i < sizeof(m.s); i += 8) {
             int ptrshift = i * 8;
-            skipjack_enc((&m.s + ptrshift),&key);
+            skipjack_enc((&m.s + ptrshift),&encryptionkey);
         }
     } else {
-        memcpy((void*)&m.key, (void*)&key, EEPROM_KEY_SIZE);
+        memcpy((void*)&m.enckey, (void*)&encryptionkey, EEPROM_ENC_KEY_SIZE);
     }
     
     radio.powerUp();
@@ -325,8 +338,8 @@ bool shouldEncrypt() {
     return result;*/
 }
 
-bool keyIsEmpty(byte * key) {
-    for (int i = 0; i < EEPROM_KEY_SIZE; i++) {
+bool keyIsEmpty(byte * key, int size) {
+    for (int i = 0; i < size; i++) {
         if (key[i] != 0xff) {
             return false;   
         }
@@ -334,9 +347,9 @@ bool keyIsEmpty(byte * key) {
     return true;
 }
 
-void generateKey(byte * key) {
+void generateKey(byte * key, int size) {
    randomSeed(analogRead(A0));
-   for (int i = 0; i < EEPROM_KEY_SIZE; i++) {
+   for (int i = 0; i < size; i++) {
        key[i] = (unsigned char) random(0,255);  
    } 
 }

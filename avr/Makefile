@@ -10,10 +10,10 @@ EXTRA        = -Os -mmcu=$(MCU) -fno-exceptions -ffunction-sections -fdata-secti
 AVRDUDE      = avrdude
 AVRDUDE_CONF = /etc/avrdude.conf
 BUILDDIR     = build
-$(shell if [ ! -e $(BUILDDIR) ]; then mkdir $(BUILDDIR); fi)
+ARDUINO_CPP  = $(shell find arduino-core -maxdepth 1 -name "*.cpp" -exec basename {} \;| cut -d. -f1)
+ARDUINO_C    = $(shell find arduino-core -maxdepth 1 -name "*.c" -exec basename {} \;| cut -d. -f1)
 
-ARDUINO_CPP  = $(shell basename `ls arduino-core/*.cpp`|cut -d. -f1)
-ARDUINO_C    = $(shell basename `ls arduino-core/*.c`|cut -d. -f1)
+$(shell if [ ! -e $(BUILDDIR) ]; then mkdir $(BUILDDIR); fi)
 
 all: $(BUILDDIR)/$(PROG).o
 	avr-ar rcs $(BUILDDIR)/core.a $(BUILDDIR)/*.o
