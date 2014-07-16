@@ -6,7 +6,7 @@ INCLUDE      = $(LIBINC) -I $(ARDUINO_CORE)
 MCU          = atmega328p
 PROG         = neutrinosensor
 DEFINE       = -DARDUINO=105 -D__AVR_ATmega328P__ -DF_CPU=8000000L -D__PROG_TYPES_COMPAT__
-EXTRA        = -Os -mmcu=$(MCU) -fno-exceptions -ffunction-sections -fdata-sections -MMD
+EXTRA        = -Os -mmcu=$(MCU) -fno-exceptions -ffunction-sections -fdata-sections -Wno-deprecated-declarations -MMD
 AVRDUDE      = avrdude
 AVRDUDE_CONF = /etc/avrdude.conf
 BUILDDIR     = build
@@ -22,7 +22,7 @@ all: $(BUILDDIR)/$(PROG).o
 	avr-objcopy -O ihex -R .eeprom $(BUILDDIR)/$(PROG).elf $(BUILDDIR)/$(PROG).hex
 	avr-size --mcu=$(MCU) --format=avr -C $(BUILDDIR)/$(PROG).elf
 
-$(BUILDDIR)/$(PROG).o: $(PROG).cpp $(patsubst %,$(BUILDDIR)/%.o, $(ARDUINO_CPP) $(ARDUINO_C) skipjack BMP180 SI7021 RF24 LowPower)
+$(BUILDDIR)/$(PROG).o: $(PROG).cpp $(patsubst %,$(BUILDDIR)/%.o, $(ARDUINO_CPP) $(ARDUINO_C) skipjack BMP180 SI7021 RF24 LowPower md5)
 	$(CPP) -c $(PROG).cpp -o $@ $(INCLUDE) $(DEFINE) $(EXTRA) -std=c++11
 
 $(BUILDDIR)/RF24.o: $(BUILDDIR)/SPI.o libs/RF24/RF24.cpp
@@ -45,6 +45,9 @@ $(BUILDDIR)/SPI.o: libs/SPI/SPI.cpp
 
 $(BUILDDIR)/LowPower.o: libs/LowPower/LowPower.cpp
 	$(CPP) -c libs/LowPower/LowPower.cpp -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
+
+$(BUILDDIR)/md5.o: libs/md5/md5.c
+	$(CC) -c $< -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
 $(BUILDDIR)/%.o: arduino-core/%.cpp
 	$(CPP) -c $< -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
