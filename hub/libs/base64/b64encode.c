@@ -1,11 +1,11 @@
 /*
-cencoder.c - c source to a base64 encoding algorithm implementation
+b64encoder.c - c source to a base64 encoding algorithm implementation
 
 This is part of the libb64 project, and has been placed in the public domain.
 For details, see http://sourceforge.net/projects/libb64
 */
 
-#include "cencode.h"
+#include "b64encode.h"
 #include <string.h>
 #include <stdlib.h>
 
