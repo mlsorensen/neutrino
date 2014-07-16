@@ -22,7 +22,7 @@ all: $(BUILDDIR)/$(PROG).o
 	avr-objcopy -O ihex -R .eeprom $(BUILDDIR)/$(PROG).elf $(BUILDDIR)/$(PROG).hex
 	avr-size --mcu=$(MCU) --format=avr -C $(BUILDDIR)/$(PROG).elf
 
-$(BUILDDIR)/$(PROG).o: $(PROG).cpp $(patsubst %,$(BUILDDIR)/%.o, $(ARDUINO_CPP) $(ARDUINO_C) skipjack BMP180 SI7021 RF24 LowPower md5)
+$(BUILDDIR)/$(PROG).o: $(PROG).cpp $(patsubst %,$(BUILDDIR)/%.o, $(ARDUINO_CPP) $(ARDUINO_C) skipjack BMP180 SI7021 RF24 LowPower hmac-md5)
 	$(CPP) -c $(PROG).cpp -o $@ $(INCLUDE) $(DEFINE) $(EXTRA) -std=c++11
 
 $(BUILDDIR)/RF24.o: $(BUILDDIR)/SPI.o libs/RF24/RF24.cpp
@@ -47,6 +47,9 @@ $(BUILDDIR)/LowPower.o: libs/LowPower/LowPower.cpp
 	$(CPP) -c libs/LowPower/LowPower.cpp -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
 $(BUILDDIR)/md5.o: libs/md5/md5.c
+	$(CC) -c $< -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
+
+$(BUILDDIR)/hmac-md5.o: libs/hmac-md5/hmac-md5.c $(BUILDDIR)/md5.o
 	$(CC) -c $< -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
 $(BUILDDIR)/%.o: arduino-core/%.cpp
