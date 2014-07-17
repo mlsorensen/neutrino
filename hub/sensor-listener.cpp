@@ -76,6 +76,8 @@ float ctof(int16_t c);
 bool decrypt_sensordata(message *m);
 bool check_sensordata_signature(message *m);
 bool encryption_key_is_empty(char * key);
+bool sensor_is_known(int sensorid);
+bool listener_should_discover();
 unsigned int get_sensor_id(MYSQL *conn, int sensorid, int sensorhubid);
 
 int main(int argc, char** argv) {
@@ -108,6 +110,12 @@ int main(int argc, char** argv) {
                         printf("unable to verify signature on decrypted data from sensor %d, ignoring\n", m.addr);
                         continue;
                     }
+                } else {
+                    // if unencrypted and sensor is not known about, add it if we are in discovery mode. If we are not, simply warn and loop.
+                    if(sensor_is_known(m.addr) == false && listener_should_discover() == false) {
+                        fprintf(stderr, "Received unencrypted communication from sensor addr %d, and we are not in discovery mode. Dropping broadcast\n", m.addr);
+                        continue;
+                    } 
                 }
 
                 // encryption key human readable
@@ -153,6 +161,92 @@ int main(int argc, char** argv) {
 
 float ctof (int16_t c) {
     return c * .018 + 32;
+}
+
+bool sensor_is_known(int sensoraddr) {
+    char sql[256];
+    MYSQL *conn;
+
+    conn = mysql_init(NULL);
+    if (!mysql_real_connect(conn, mysqlserver, mysqluser, mysqlpass, mysqldb, 0, NULL, 0)) {
+        fprintf(stderr, "Cant connect to database: %s\n", mysql_error(conn));
+        exit(1);
+    } else {
+        fprintf(stdout, "Connected to database\n");
+    }
+
+    sprintf(sql,"SELECT id from sensor where sensor_address=%d and sensor_hub_id=%d", sensoraddr, sensorhubid);
+    if(mysql_query(conn, sql)) {
+        fprintf(stderr, "SQL error on sensor lookup: %s\n", mysql_error(conn));
+        return false;
+    }
+    bzero(sql, 256);
+
+    MYSQL_RES *result = mysql_store_result(conn);
+    if (result == NULL) {
+        fprintf(stderr, "could not fetch sensor from db: %s\n", mysql_error(conn));
+        mysql_free_result(result);
+        return false;
+    }
+
+    MYSQL_ROW row;
+    row = mysql_fetch_row(result);
+    mysql_free_result(result);
+
+    if (row == NULL) {
+        fprintf(stderr, "no result when looking up sensor\n");
+        return false;
+    }
+
+    if(row[0] > 0) {
+        return true;
+    }
+
+    return false;
+}
+
+bool listener_should_discover() {
+char sql[256];
+    MYSQL *conn;
+
+    conn = mysql_init(NULL);
+    if (!mysql_real_connect(conn, mysqlserver, mysqluser, mysqlpass, mysqldb, 0, NULL, 0)) {
+        fprintf(stderr, "Cant connect to database: %s\n", mysql_error(conn));
+        exit(1);
+    } else {
+        fprintf(stdout, "Connected to database\n");
+    }
+
+    sprintf(sql,"SELECT value from configuration where name='discovery'");
+    if(mysql_query(conn, sql)) {
+        fprintf(stderr, "SQL error on discovery mode lookup: %s\n", mysql_error(conn));
+        return false;
+    }
+    bzero(sql, 256);
+
+    MYSQL_RES *result = mysql_store_result(conn);
+    if (result == NULL) {
+        fprintf(stderr, "could not fetch discovery mode from db: %s\n", mysql_error(conn));
+        mysql_free_result(result);
+        return false;
+    }
+
+    MYSQL_ROW row;
+    row = mysql_fetch_row(result);
+    mysql_free_result(result);
+
+    if (row == NULL) {
+        fprintf(stderr, "no result when looking up discovery mode\n");
+        return false;
+    }
+
+    if(strcmp(row[0],"1") == 0) {
+        fprintf(stderr, "looks like we are in discovery mode\n");
+        return true;
+    }
+
+    fprintf(stderr, "we are not in discovery mode\n");
+    return false;
 }
 
 bool decrypt_sensordata(message *m) {
