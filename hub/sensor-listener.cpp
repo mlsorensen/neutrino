@@ -9,6 +9,7 @@
 #include <libconfig.h++>
 #include <RF24.h>
 #include <skipjack.h>
+#include <hmac-md5.h>
 
 #define SKIPJACK_KEY_SIZE 10
 #define SIGNATURE_KEY_SIZE 4
@@ -52,7 +53,7 @@ sensordata {
     int16_t  humidity; // humidity in basis points (percent of percent)
     uint16_t pressuredp; // pressure in decapascals
     uint16_t millivolts; // battery voltage millivolts
-    char     signature[SIGNATURE_SIZE]; //truncated md5 of sensor data
+    uint8_t  signature[SIGNATURE_SIZE]; //truncated md5 of sensor data
 };
 
 // struct message = 28 bytes. Want to keep this <= 32 bytes so that it will fit in one radio message
@@ -94,8 +95,14 @@ int main(int argc, char** argv) {
             bool nread = radio.read(&m, sizeof m);
             if(nread) {
                 if(m.encrypted  == true && decrypt_sensordata(&m) == false) {
+                    // decrypt sensor data before continuing
                     if (decrypt_sensordata(&m) == false || m.enckey == 0x00) {
                         printf("message from sensor address %d was encrypted and unable to decrypt\n", m.addr);
+                        continue;
+                    }
+                    // check signature before continuing
+                    if (check_sensordata_signature(&m) == false || m.sigkey == 0x00) {
+                        printf("unable to verify signature on decrypted data from sensor %d, ignoring\n", m.addr);
                         continue;
                     }
                 }
@@ -156,7 +163,7 @@ bool decrypt_sensordata(message *m) {
 
     MYSQL_RES *result = mysql_store_result(conn);
     if (result == NULL) {
-        fprintf(stderr, "could not fetch sensor id from db: %s\n", mysql_error(conn));
+        fprintf(stderr, "could not fetch sensor encryption key from db: %s\n", mysql_error(conn));
         mysql_free_result(result);
         return false;
     }
@@ -170,13 +177,62 @@ bool decrypt_sensordata(message *m) {
         return false;
     }
 
-    fprintf(stderr, "found key %s in database\n", row[0]);
+    fprintf(stderr, "found encryption key %s in database\n", row[0]);
 
     // decrypt memory blocks containing sensor data. skipjack is 64 bit (8 byte) blocks
     for (int i = 0; i < sizeof(m->s); i += 8) {
         int ptrshift = i * 8;
         skipjack_dec((&m->s + ptrshift), row[0]);
     }
+    return true;
+}
+
+bool check_sensordata_signature(message *m) {
+    // look up hmac key in db
+    char sql[256];
+    MYSQL *conn;
+
+    conn = mysql_init(NULL);
+    if (!mysql_real_connect(conn, mysqlserver, mysqluser, mysqlpass, mysqldb, 0, NULL, 0)) {
+        fprintf(stderr, "Cant connect to database: %s\n", mysql_error(conn));
+        exit(1);
+    } else {
+        fprintf(stdout, "Connected to database\n");
+    }
+
+    sprintf(sql,"SELECT sensor_signature_key from sensor where sensor_address=%d and sensor_hub_id=%d", m->addr, sensorhubid);
+    if(mysql_query(conn, sql)) {
+        fprintf(stderr, "SQL error on sensor hmac key lookup: %s\n", mysql_error(conn));
+        return false;
+    }
+    bzero(sql, 256);
+
+    MYSQL_RES *result = mysql_store_result(conn);
+    if (result == NULL) {
+        fprintf(stderr, "could not fetch sensor hmac from db: %s\n", mysql_error(conn));
+        mysql_free_result(result);
+        return false;
+    }
+
+    MYSQL_ROW row;
+    row = mysql_fetch_row(result);
+    mysql_free_result(result);
+
+    if (row == NULL) {
+        fprintf(stderr, "no result when looking up sensor encryption key\n");
+        return false;
+    }
+
+    fprintf(stderr, "found hmac key %s in database\n", row[0]);
+
+    uint8_t hmac[SIGNATURE_SIZE];
+    hmac_md5(&hmac, &row[0], SIGNATURE_KEY_SIZE*8, &m->s, 88);
+
+    if(memcmp(hmac, m->s.signature, sizeof(a)) != 0) {
+        return false;
+    }
+
+    fprintf(stderr, "Signature verification successful\n");
     return true;
 }
 
@@ -196,7 +252,7 @@ int insert_neutrino_data(message *m) {
     }
 
     // ensure sensor is in sensor table
-    sprintf(sql,"INSERT IGNORE INTO sensor (sensor_address,sensor_hub_id,sensor_encryption_key) VALUES (%d, %d, '%s')", m->addr, sensorhubid, m->enckey);
+    sprintf(sql,"INSERT IGNORE INTO sensor (sensor_address,sensor_hub_id,sensor_encryption_key,signature_key) VALUES (%d, %d, '%s','%s')", m->addr, sensorhubid, m->enckey, m->sigkey);
     if (mysql_query(conn, sql)) {
         fprintf(stderr, "SQL error on sensor insert: %s\n", mysql_error(conn));
         return -1;

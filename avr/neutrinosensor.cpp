@@ -64,7 +64,7 @@ struct sensordata {
     int16_t  humidity     = 0; // humidity in basis points (percent of percent)
     uint16_t pressuredp   = 0; // pressure in decapascals
     uint16_t millivolts   = 0; // battery voltage millivolts
-    byte signature[5]     = {0x00, 0x00, 0x00, 0x00, 0x00}; //truncated md5 of sensor data
+    uint8_t  signature[5] = {0x00, 0x00, 0x00, 0x00, 0x00}; //truncated md5 of sensor data
 };
 
 // 32 bytes. Want to keep this <= 32 bytes so that it will fit in one radio packet
@@ -176,8 +176,8 @@ void loop() {
             skipjack_enc((&m.s + ptrshift),&encryptionkey);
         }
     } else {
-        memcpy((void*)&m.enckey, (void*)&encryptionkey, EEPROM_ENC_KEY_SIZE);
-        memcpy((void*)&m.sigkey, (void*)&signaturekey, EEPROM_SIG_KEY_SIZE);
+        memcpy(&m.enckey, &encryptionkey, EEPROM_ENC_KEY_SIZE);
+        memcpy(&m.sigkey, &signaturekey, EEPROM_SIG_KEY_SIZE);
     }
     
     radio.powerUp();
