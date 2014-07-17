@@ -13,7 +13,7 @@
 
 #define EEPROM_ENC_KEY_ADDR 0x00
 #define EEPROM_ENC_KEY_SIZE 10
-#define EEPROM_SIG_KEY_ADDR 0x10
+#define EEPROM_SIG_KEY_ADDR 0x0a
 #define EEPROM_SIG_KEY_SIZE 4
 
 #define CHANNEL_PIN_0 0
@@ -86,7 +86,7 @@ byte signaturekey[EEPROM_SIG_KEY_SIZE];
 
 void setup() {
     // populate encryption key
-    eeprom_read_block((void*)&encryptionkey, (const void*)EEPROM_ENC_KEY_ADDR, EEPROM_SIG_KEY_SIZE);
+    eeprom_read_block((void*)&encryptionkey, (const void*)EEPROM_ENC_KEY_ADDR, EEPROM_ENC_KEY_SIZE);
     if (keyIsEmpty(encryptionkey, EEPROM_ENC_KEY_SIZE)) {
         generateKey(encryptionkey, EEPROM_ENC_KEY_SIZE);
         eeprom_write_block((const void*)&encryptionkey, (void*)EEPROM_ENC_KEY_ADDR, EEPROM_ENC_KEY_SIZE);
