@@ -74,6 +74,7 @@ bool publish_zabbix(message *m);
 int insert_neutrino_data(message *m);
 float ctof(int16_t c);
 bool decrypt_sensordata(message *m);
+bool check_sensordata_signature(message *m);
 bool encryption_key_is_empty(char * key);
 unsigned int get_sensor_id(MYSQL *conn, int sensorid, int sensorhubid);
 
@@ -94,21 +95,34 @@ int main(int argc, char** argv) {
             bzero(m.enckey, SKIPJACK_KEY_SIZE);
             bool nread = radio.read(&m, sizeof m);
             if(nread) {
-                if(m.encrypted  == true && decrypt_sensordata(&m) == false) {
+                if(m.encrypted) {
                     // decrypt sensor data before continuing
+                    fprintf(stderr, "decrypting message\n");
                     if (decrypt_sensordata(&m) == false || m.enckey == 0x00) {
                         printf("message from sensor address %d was encrypted and unable to decrypt\n", m.addr);
                         continue;
                     }
                     // check signature before continuing
+                    fprintf(stderr, "checking signature for sensor data\n");
                     if (check_sensordata_signature(&m) == false || m.sigkey == 0x00) {
                         printf("unable to verify signature on decrypted data from sensor %d, ignoring\n", m.addr);
                         continue;
                     }
                 }
 
+                // encryption key human readable
+                char enckey[8];
+                bzero(enckey, 8);
+                for (int i=0; i<sizeof(m.enckey); i++) {
+                    char * byte = (char*)malloc(2);
+                    sprintf(byte,"%x",m.enckey[i]);
+                    strncat(enckey, byte, 2);
+                    free(byte);
+                }                
+
                 printf("radio at address %d :\n",m.addr);
-                printf("encryption key is %s\n",m.enckey);
+                printf("encryption key is %s\n",enckey);
+                printf("hmac key is %x%x%x%x\n", m.sigkey[0], m.sigkey[1], m.sigkey[2], m.sigkey[3]);
                 printf("encryption is %s\n", m.encrypted ? "true" : "false");
                 printf("Temperature is %.2f F\n", ctof(m.s.tempc));
                 printf("Temperature is %.2f C\n", (float)m.s.tempc / 100);
@@ -177,7 +191,16 @@ bool decrypt_sensordata(message *m) {
         return false;
     }
 
-    fprintf(stderr, "found encryption key %s in database\n", row[0]);
+    //fprintf(stderr, "found encryption key %s in database\n", row[0]);
+    char enckey[20];
+    bzero(enckey, 20);
+    for (int i = 0; i < SKIPJACK_KEY_SIZE; i++) {
+        char * byte = (char*)malloc(2);
+        sprintf(byte,"%x",row[0][i]);
+        strncat(enckey, byte, 2);
+        free(byte);
+    }
+    fprintf(stderr, "found encryption key %s in database\n", enckey);
 
     // decrypt memory blocks containing sensor data. skipjack is 64 bit (8 byte) blocks
     for (int i = 0; i < sizeof(m->s); i += 8) {
@@ -223,16 +246,17 @@ bool check_sensordata_signature(message *m) {
         return false;
     }
 
-    fprintf(stderr, "found hmac key %s in database\n", row[0]);
+    fprintf(stderr, "found hmac key '%s' '%x%x%x%x' in database\n", row[0], row[0][0], row[0][1], row[0][2], row[0][3]);
 
     uint8_t hmac[SIGNATURE_SIZE];
-    hmac_md5(&hmac, &row[0], SIGNATURE_KEY_SIZE*8, &m->s, 88);
+    hmac_md5(&hmac, row[0], SIGNATURE_KEY_SIZE*8, &m->s, 88);
 
-    if(memcmp(hmac, m->s.signature, sizeof(a)) != 0) {
+    if(memcmp(hmac, m->s.signature, SIGNATURE_SIZE) != 0) {
+        fprintf(stderr, "signature verification failure, '%x%x%x%x%x' != '%x%x%x%x%x'\n", hmac[0], hmac[1], hmac[2], hmac[3], hmac[4], m->s.signature[0], m->s.signature[1], m->s.signature[2], m->s.signature[3], m->s.signature[4] );
         return false;
     }
 
-    fprintf(stderr, "Signature verification successful\n");
+    fprintf(stderr, "Signature verification successful!\n");
     return true;
 }
 
@@ -252,7 +276,7 @@ int insert_neutrino_data(message *m) {
     }
 
     // ensure sensor is in sensor table
-    sprintf(sql,"INSERT IGNORE INTO sensor (sensor_address,sensor_hub_id,sensor_encryption_key,signature_key) VALUES (%d, %d, '%s','%s')", m->addr, sensorhubid, m->enckey, m->sigkey);
+    sprintf(sql,"INSERT IGNORE INTO sensor (sensor_address,sensor_hub_id,sensor_encryption_key,sensor_signature_key) VALUES (%d, %d, '%s','%s')", m->addr, sensorhubid, m->enckey, m->sigkey);
     if (mysql_query(conn, sql)) {
         fprintf(stderr, "SQL error on sensor insert: %s\n", mysql_error(conn));
         return -1;
