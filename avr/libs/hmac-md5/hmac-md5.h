@@ -36,7 +36,12 @@ void hmac_md5_nextBlock(hmac_md5_ctx_t *s, const void *block);
 void hmac_md5_lastBlock(hmac_md5_ctx_t *s, const void *block, uint16_t length_b);
 void hmac_md5_final(void *dest, hmac_md5_ctx_t *s);
 
+#if defined (__cplusplus)
+extern "C" {
+#endif
 void hmac_md5(void *dest, void *key, uint16_t keylength_b, void *msg, uint32_t msglength_b);
-
+#if defined (__cplusplus)
+}
+#endif
 
 #endif /*HMACMD5_H_*/

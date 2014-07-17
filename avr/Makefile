@@ -46,7 +46,10 @@ $(BUILDDIR)/SPI.o: libs/SPI/SPI.cpp
 $(BUILDDIR)/LowPower.o: libs/LowPower/LowPower.cpp
 	$(CPP) -c libs/LowPower/LowPower.cpp -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
-$(BUILDDIR)/md5.o: libs/md5/md5.c
+$(BUILDDIR)/md5.o: libs/md5/md5.c $(BUILDDIR)/md5_sbox.o
+	$(CC) -c $< -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
+
+$(BUILDDIR)/md5_sbox.o: libs/md5/md5_sbox.c
 	$(CC) -c $< -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
 $(BUILDDIR)/hmac-md5.o: libs/hmac-md5/hmac-md5.c $(BUILDDIR)/md5.o

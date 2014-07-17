@@ -3,12 +3,13 @@
 #include <BMP180.h>
 #include <SI7021.h>
 #include <SPI.h>
-#include "RF24.h"
+#include <RF24.h>
 #include <string.h>
 #include <avr/sleep.h>
 #include <avr/eeprom.h>
 #include <LowPower.h>
 #include <skipjack.h>
+#include <hmac-md5.h>
 
 #define EEPROM_ENC_KEY_ADDR 0x00
 #define EEPROM_ENC_KEY_SIZE 10
@@ -163,6 +164,12 @@ void loop() {
     // when encryption is disabled, we send the key. when it is enabled, we send the empty key
     if (shouldEncrypt()) {
         m.encrypted = true;
+        // hmac the first 88 bits of the sensor data (everything but the signature itself)
+        uint8_t hmac[16];
+        hmac_md5(&hmac, &signaturekey, EEPROM_SIG_KEY_SIZE * 8, &m.s, 88);
+        // populate the signature entry within sensor data, before we encrypt
+        memcpy(&m.s.signature, &hmac, 5);
+        
         // encrypt memory blocks containing sensor data. skipjack is 64 bit (8 byte) blocks
         for (int i = 0; i < sizeof(m.s); i += 8) {
             int ptrshift = i * 8;
@@ -170,6 +177,7 @@ void loop() {
         }
     } else {
         memcpy((void*)&m.enckey, (void*)&encryptionkey, EEPROM_ENC_KEY_SIZE);
+        memcpy((void*)&m.sigkey, (void*)&signaturekey, EEPROM_SIG_KEY_SIZE);
     }
     
     radio.powerUp();
