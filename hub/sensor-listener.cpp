@@ -79,6 +79,7 @@ bool encryption_key_is_empty(char * key);
 bool sensor_is_known(int sensorid);
 bool listener_should_discover();
 unsigned int get_sensor_id(MYSQL *conn, int sensorid, int sensorhubid);
+MYSQL_ROW sql_select_row(char * sql);
 
 int main(int argc, char** argv) {
     //don't buffer what we print
@@ -165,75 +166,60 @@ float ctof (int16_t c) {
 
 bool sensor_is_known(int sensoraddr) {
     char sql[256];
-    MYSQL *conn;
-
-    conn = mysql_init(NULL);
-    if (!mysql_real_connect(conn, mysqlserver, mysqluser, mysqlpass, mysqldb, 0, NULL, 0)) {
-        fprintf(stderr, "Cant connect to database: %s\n", mysql_error(conn));
-        exit(1);
-    } else {
-        fprintf(stdout, "Connected to database\n");
-    }
+    MYSQL_ROW row;
 
     sprintf(sql,"SELECT id from sensor where sensor_address=%d and sensor_hub_id=%d", sensoraddr, sensorhubid);
-    if(mysql_query(conn, sql)) {
-        fprintf(stderr, "SQL error on sensor lookup: %s\n", mysql_error(conn));
-        return false;
-    }
-    bzero(sql, 256);
-
-    MYSQL_RES *result = mysql_store_result(conn);
-    if (result == NULL) {
-        fprintf(stderr, "could not fetch sensor from db: %s\n", mysql_error(conn));
-        mysql_free_result(result);
-        return false;
-    }
-
-    MYSQL_ROW row;
-    row = mysql_fetch_row(result);
-    mysql_free_result(result);
+    row = sql_select_row(sql);
 
     if (row == NULL) {
-        fprintf(stderr, "no result when looking up sensor\n");
         return false;
     }
 
-    if(row[0] > 0) {
+    if (row[0] > 0) {
+        fprintf(stderr, "found sensor id %s\n", row[0]);
         return true;
     }
 
     return false;
 }
 
-bool listener_should_discover() {
-char sql[256];
+MYSQL_ROW sql_select_row(char * sql) {
     MYSQL *conn;
+    MYSQL_ROW row;
 
     conn = mysql_init(NULL);
     if (!mysql_real_connect(conn, mysqlserver, mysqluser, mysqlpass, mysqldb, 0, NULL, 0)) {
         fprintf(stderr, "Cant connect to database: %s\n", mysql_error(conn));
-        exit(1);
     } else {
         fprintf(stdout, "Connected to database\n");
     }
 
-    sprintf(sql,"SELECT value from configuration where name='discovery'");
     if(mysql_query(conn, sql)) {
-        fprintf(stderr, "SQL error on discovery mode lookup: %s\n", mysql_error(conn));
-        return false;
+        fprintf(stderr, "SQL error on fetch row: %s\n", mysql_error(conn));
     }
-    bzero(sql, 256);
 
     MYSQL_RES *result = mysql_store_result(conn);
     if (result == NULL) {
-        fprintf(stderr, "could not fetch discovery mode from db: %s\n", mysql_error(conn));
+        fprintf(stderr, "could not fetch row from db: %s\n", mysql_error(conn));
         mysql_free_result(result);
-        return false;
     }
 
-    MYSQL_ROW row;
     row = mysql_fetch_row(result);
     mysql_free_result(result);
+
+    if (row == NULL) {
+        fprintf(stderr, "no result from mysql query\n");
+    }
+
+    return row;
+}
+
+bool listener_should_discover() {
+    char sql[256];
+    MYSQL_ROW row;
+
+    sprintf(sql,"SELECT value from configuration where name='discovery'");
+    row = sql_select_row(sql);
 
     if (row == NULL) {
         fprintf(stderr, "no result when looking up discovery mode\n");
@@ -252,33 +238,10 @@ char sql[256];
 bool decrypt_sensordata(message *m) {
     // look up encryption key in db
     char sql[256];
-    MYSQL *conn;
-
-    conn = mysql_init(NULL);
-    if (!mysql_real_connect(conn, mysqlserver, mysqluser, mysqlpass, mysqldb, 0, NULL, 0)) {
-        fprintf(stderr, "Cant connect to database: %s\n", mysql_error(conn));
-        exit(1);
-    } else {
-        fprintf(stdout, "Connected to database\n");
-    }
+    MYSQL_ROW row;
 
     sprintf(sql,"SELECT sensor_encryption_key from sensor where sensor_address=%d and sensor_hub_id=%d", m->addr, sensorhubid);
-    if(mysql_query(conn, sql)) {
-        fprintf(stderr, "SQL error on sensor encryption key lookup: %s\n", mysql_error(conn));
-        return false;
-    }
-    bzero(sql, 256);
-
-    MYSQL_RES *result = mysql_store_result(conn);
-    if (result == NULL) {
-        fprintf(stderr, "could not fetch sensor encryption key from db: %s\n", mysql_error(conn));
-        mysql_free_result(result);
-        return false;
-    }
-
-    MYSQL_ROW row;
-    row = mysql_fetch_row(result);
-    mysql_free_result(result);
+    row = sql_select_row(sql);
 
     if (row == NULL) {
         fprintf(stderr, "no result when looking up sensor encryption key\n");
@@ -307,33 +270,10 @@ bool decrypt_sensordata(message *m) {
 bool check_sensordata_signature(message *m) {
     // look up hmac key in db
     char sql[256];
-    MYSQL *conn;
-
-    conn = mysql_init(NULL);
-    if (!mysql_real_connect(conn, mysqlserver, mysqluser, mysqlpass, mysqldb, 0, NULL, 0)) {
-        fprintf(stderr, "Cant connect to database: %s\n", mysql_error(conn));
-        exit(1);
-    } else {
-        fprintf(stdout, "Connected to database\n");
-    }
+    MYSQL_ROW row;
 
     sprintf(sql,"SELECT sensor_signature_key from sensor where sensor_address=%d and sensor_hub_id=%d", m->addr, sensorhubid);
-    if(mysql_query(conn, sql)) {
-        fprintf(stderr, "SQL error on sensor hmac key lookup: %s\n", mysql_error(conn));
-        return false;
-    }
-    bzero(sql, 256);
-
-    MYSQL_RES *result = mysql_store_result(conn);
-    if (result == NULL) {
-        fprintf(stderr, "could not fetch sensor hmac from db: %s\n", mysql_error(conn));
-        mysql_free_result(result);
-        return false;
-    }
-
-    MYSQL_ROW row;
-    row = mysql_fetch_row(result);
-    mysql_free_result(result);
+    row = sql_select_row(sql);
 
     if (row == NULL) {
         fprintf(stderr, "no result when looking up sensor encryption key\n");
