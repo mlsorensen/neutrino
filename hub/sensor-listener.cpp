@@ -22,6 +22,7 @@ int main(int argc, char** argv) {
 
     while(1) {
         if (radio.available()) {
+            fprintf(stderr, "got message on radio\n");
             message m;
             bzero(m.enckey, SKIPJACK_KEY_SIZE);
             bool nread = radio.read(&m, sizeof m);

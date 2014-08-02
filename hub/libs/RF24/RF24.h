@@ -16,6 +16,9 @@
 #define __RF24_H__
 
 #include "RF24_config.h"
+#ifdef __ARM_ARCH_6__
+#include "compatibility.h"
+#endif
 
 /**
  * Power Amplifier level.
@@ -46,6 +49,10 @@ class RF24
 {
 private:
   uint8_t ce_pin; /**< "Chip Enable" pin, activates the RX or TX role */
+#ifdef __ARM_ARCH_6__
+  string spidevice;
+  uint32_t spispeed;
+#endif
   uint8_t csn_pin; /**< SPI Chip select */
   bool wide_band; /* 2Mbs data rate in use? */
   bool p_variant; /* False for RF24L01 and true for RF24L01P */
@@ -238,6 +245,9 @@ public:
    * @param _cspin The pin attached to Chip Select
    */
   RF24(uint8_t _cepin, uint8_t _cspin);
+#ifdef __ARM_ARCH_6__
+  RF24(string _spidevice, uint32_t _spispeed, uint8_t _cepin);
+#endif
 
   /**
    * Begin operation of the chip
@@ -245,6 +255,13 @@ public:
    * Call this in setup(), before calling any other methods.
    */
   void begin(void);
+
+  /**
+    * Reset confguration of the chip
+    *
+    * Call this to reset all registers
+    */
+   void resetcfg(void);
 
   /**
    * Start listening on the pipes opened for reading.

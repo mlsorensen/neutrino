@@ -6,6 +6,7 @@ MYSQLFLAGS = $(shell mysql_config --cflags)
 MYSQLLIBS  = $(shell mysql_config --libs)
 PROG       = sensor-listener
 BUILDDIR   = build
+__ARM_ARCH_6__ = 1
 $(shell if [ ! -e $(BUILDDIR) ]; then mkdir $(BUILDDIR); fi)
 
 all: $(PROG)

@@ -19,9 +19,11 @@ void RF24::csn(int mode)
   // divider of 4 is the minimum we want.
   // CLK:BUS 8Mhz:2Mhz, 16Mhz:4Mhz, or 20Mhz:5Mhz
 #ifdef ARDUINO
+#ifdef __ARM_ARCH_7A__
   spi->setBitOrder(MSBFIRST);
   spi->setDataMode(spi_MODE0);
   spi->setClockDivider(spi_CLOCK_DIV4);
+#endif
 #endif
   digitalWrite(csn_pin,mode);
   
@@ -247,6 +249,16 @@ RF24::RF24(uint8_t _cepin, uint8_t _cspin):
 
 }
 
+#ifdef __ARM_ARCH_6__
+RF24::RF24(string _spidevice, uint32_t _spispeed, uint8_t _cepin):
+spidevice( _spidevice) ,spispeed( _spispeed),ce_pin(_cepin), wide_band(true), p_variant(false),
+  payload_size(32), ack_payload_available(false), dynamic_payloads_enabled(false),
+  pipe0_reading_address(0)
+{
+
+}
+#endif
+
 /****************************************************************************/
 
 void RF24::setChannel(uint8_t channel)
@@ -299,8 +311,8 @@ static const char * const rf24_crclength_e_str_P[] PROGMEM = {
 };
 static const char rf24_pa_dbm_e_str_0[] PROGMEM = "PA_MIN";
 static const char rf24_pa_dbm_e_str_1[] PROGMEM = "PA_LOW";
-static const char rf24_pa_dbm_e_str_2[] PROGMEM = "LA_MED";
-static const char rf24_pa_dbm_e_str_3[] PROGMEM = "PA_HIGH";
+static const char rf24_pa_dbm_e_str_2[] PROGMEM = "PA_HIGH";
+static const char rf24_pa_dbm_e_str_3[] PROGMEM = "PA_MAX";
 static const char * const rf24_pa_dbm_e_str_P[] PROGMEM = { 
   rf24_pa_dbm_e_str_0,
   rf24_pa_dbm_e_str_1,
@@ -328,17 +340,42 @@ void RF24::printDetails(void)
   printf_P(PSTR("Model\t\t = %s\r\n"),pgm_read_word(&rf24_model_e_str_P[isPVariant()]));
   printf_P(PSTR("CRC Length\t = %s\r\n"),pgm_read_word(&rf24_crclength_e_str_P[getCRCLength()]));
   printf_P(PSTR("PA Power\t = %s\r\n"),pgm_read_word(&rf24_pa_dbm_e_str_P[getPALevel()]));
+
+#ifdef __ARM_ARCH_6__
+  printf_P(PSTR("SPI device\t = %s\r\n"),spidevice.c_str() );
+  printf_P(PSTR("SPI speed\t = %d\r\n"),spispeed);
+  printf_P(PSTR("CE GPIO\t = %d\r\n"),ce_pin);
+#endif
 }
 
 /****************************************************************************/
 
 void RF24::begin(void)
 {
+
+#ifdef __ARM_ARCH_7A__
   spi = new SPI();
   
   // just to simulate arduino milis()
   __start_timer();
-  // Initialize pins
+#endif
+
+#ifdef __ARM_ARCH_6__
+if ( spidevice == "/dev/spidev0.1" ) {
+    csn_pin=9;
+} else {
+    csn_pin=8;
+}
+
+  // Initialize SPI bus
+  //spi->begin();
+spi = new SPI();
+        spi->setdevice(spidevice);
+        spi->setspeed(spispeed);
+        spi->setbits(8);
+        spi->init();
+#endif
+
   pinMode(ce_pin,OUTPUT);
   pinMode(csn_pin,OUTPUT);
 
@@ -356,7 +393,7 @@ void RF24::begin(void)
   // Set 1500uS (minimum for 32B payload in ESB@250KBPS) timeouts, to make testing a little easier
   // WARNING: If this is ever lowered, either 250KBS mode with AA is broken or maximum packet
   // sizes must never be used. See documentation for a more complete explanation.
-  write_register(SETUP_RETR,(0b0100 << ARD) | (0b1111 << ARC));
+  write_register(SETUP_RETR,(0b0101 << ARD) | (0b1111 << ARC));
 
   // Restore our default PA level
   setPALevel( RF24_PA_MAX ) ;
@@ -394,6 +431,12 @@ void RF24::begin(void)
   flush_tx();
 }
 
+#ifdef __ARCH_ARM_6
+void RF24::resetcfg(void){
+  write_register(0x00,0x0f);
+}
+#endif
+
 /****************************************************************************/
 
 void RF24::startListening(void)
@@ -406,8 +449,8 @@ void RF24::startListening(void)
     write_register(RX_ADDR_P0, reinterpret_cast<const uint8_t*>(&pipe0_reading_address), 5);
 
   // Flush buffers
-  flush_rx();
-  flush_tx();
+  //flush_rx(); // was not commented out for bbb
+  //flush_tx(); // was not commented out for bbb
 
   // Go!
   ce(HIGH);
@@ -430,6 +473,7 @@ void RF24::stopListening(void)
 void RF24::powerDown(void)
 {
   write_register(CONFIG,read_register(CONFIG) & ~_BV(PWR_UP));
+  delayMicroseconds(150);
 }
 
 /****************************************************************************/
@@ -437,6 +481,7 @@ void RF24::powerDown(void)
 void RF24::powerUp(void)
 {
   write_register(CONFIG,read_register(CONFIG) | _BV(PWR_UP));
+  delayMicroseconds(150);
 }
 
 /******************************************************************/
@@ -497,11 +542,13 @@ bool RF24::write( const void* buf, uint8_t len )
 
   // Yay, we are done.
 
+#ifdef __ARCH_ARM_7A__
   // Power down
   powerDown();
 
   // Flush buffers (Is this a relic of past experimentation, and not needed anymore??)
   flush_tx();
+#endif
 
   return result;
 }
@@ -511,7 +558,7 @@ void RF24::startWrite( const void* buf, uint8_t len )
 {
   // Transmitter power-up
   write_register(CONFIG, ( read_register(CONFIG) | _BV(PWR_UP) ) & ~_BV(PRIM_RX) );
-  delayMicroseconds(150);
+  //delayMicroseconds(150);
 
   // Send the payload
   write_payload( buf, len );
@@ -641,6 +688,7 @@ void RF24::openReadingPipe(uint8_t child, uint64_t address)
 
   if (child <= 6)
   {
+#ifdef __ARCH_ARM_7A__
     // For pipes 2-5, only write the LSB
     if ( child < 2 )
       write_register(child_pipe[child], reinterpret_cast<const uint8_t*>(&address), 5);
@@ -653,6 +701,20 @@ void RF24::openReadingPipe(uint8_t child, uint64_t address)
     // pipes at once.  However, I thought it would make the calling code
     // more simple to do it this way.
     write_register(EN_RXADDR,read_register(EN_RXADDR) | _BV(child_pipe_enable[child]));
+#endif
+#ifdef __ARCH_ARM_6__
+    if ( child < 2 )
+      write_register(pgm_read_byte(&child_pipe[child]), reinterpret_cast<const uint8_t*>(&address), 5);
+    else
+      write_register(pgm_read_byte(&child_pipe[child]), reinterpret_cast<const uint8_t*>(&address), 1);
+
+    write_register(pgm_read_byte(&child_payload_size[child]),payload_size);
+
+    // Note it would be more efficient to set all of the bits for all open
+    // pipes at once.  However, I thought it would make the calling code
+    // more simple to do it this way.
+    write_register(EN_RXADDR,read_register(EN_RXADDR) | _BV(pgm_read_byte(&child_pipe_enable[child])));
+#endif
   }
 }
 

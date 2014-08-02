@@ -11,15 +11,36 @@
 #include "spi.h"
 
 SPI::SPI() {
-	
+#ifdef __ARCH_ARM_7A__	
 	this->device = "/dev/spidev1.0";;
+#endif
 	this->bits = 8;
 //	this->speed = 24000000; // 24Mhz - proly doesnt work
+#ifdef __ARCH_ARM_7A__
 	this->speed = 16000000; // 16Mhz 
+    this->init();
+#endif
 //	this->speed = 8000000; // 8Mhz 
 //	this->speed = 2000000; // 2Mhz 
+#ifdef __ARCH_ARM_6__
+    this->speed = 2000000; //2Mhz
+    this->mode = 0;
+#endif
+}
 
-	this->init();
+void SPI::setbits( uint8_t bits )
+{
+ this->bits = bits;
+}
+
+void SPI::setspeed( uint32_t speed )
+{
+ this->speed = speed;
+}
+
+void SPI::setdevice( string devicefile )
+{
+  this->device = devicefile;
 }
 
 void SPI::init()
@@ -96,7 +117,9 @@ uint8_t SPI::transfer(uint8_t tx_)
 	tr.rx_buf = (unsigned long)rx;
 	tr.len = ARRAY_SIZE(tx);
 	tr.delay_usecs = 0;
+#ifdef __ARCH_ARM_7A__
 	tr.cs_change = 1;
+#endif
 	tr.speed_hz = this->speed;
 	tr.bits_per_word = this->bits;
 

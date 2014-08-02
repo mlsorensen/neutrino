@@ -76,3 +76,4 @@ FLUSH PRIVILEGES;
 INSERT INTO neutrino.configuration (name, value) VALUES ('location', 'Orem, UT');
 INSERT INTO neutrino.configuration (name, value) VALUES ('tempunits', 'Fahrenheit');
 INSERT INTO neutrino.configuration (name, value) VALUES ('graphtime', 1);
+INSERT INTO neutrino.configuration (name, value) VALUES ('discovery', 1);
