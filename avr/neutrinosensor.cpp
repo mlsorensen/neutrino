@@ -25,12 +25,9 @@
 #define ADDRESS_PIN_1 6
 #define ADDRESS_PIN_2 7
 
-#define CHANNEL_PIN_0 0
-#define CHANNEL_PIN_1 1
-#define CHANNEL_PIN_2 10
-#define CHANNEL_PIN_3 A3
+#define ENCRYPT_PIN A2
 
-#define ENCRYPT_PIN A7
+#define PROXIMITY_PIN A1
 
 #define RF_GOOD_LED 3
 #define RF_BAD_LED 4
@@ -102,7 +99,7 @@ void setup() {
     // turn off analog comparator
     ACSR = B10000000;
     // turn off digital input buffers for analog pins
-    DIDR0 = DIDR0 | B00111111;
+    //DIDR0 = DIDR0 | B00111111;
     
     // turn off brown-out enable in software
     MCUCR = bit (BODS) | bit (BODSE);
@@ -196,7 +193,7 @@ void loop() {
     if (m.s.millivolts < 2200) {
         flash(LO_BATT_LED);
     }
-    
+
     // power down for 56 seconds
     for (int i = 0; i < 7; i++) {
         LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
@@ -331,8 +328,6 @@ int getMyChannel() {
 }
 
 bool shouldEncrypt() {
-    return true;
-/* commented out until hardware supports encrypt pin
     boolean result = false;
     pinMode(ENCRYPT_PIN, INPUT_PULLUP);
     
@@ -343,7 +338,7 @@ bool shouldEncrypt() {
     pinMode(ENCRYPT_PIN, OUTPUT);
     digitalWrite(ENCRYPT_PIN, LOW);
     
-    return result;*/
+    return result;
 }
 
 bool keyIsEmpty(byte * key, int size) {
