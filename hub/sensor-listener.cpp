@@ -140,6 +140,7 @@ MYSQL_ROW sql_select_row(char * sql) {
         fprintf(stderr, "no result from mysql query\n");
     }
 
+    mysql_close(conn);
     return row;
 }
 
@@ -190,7 +191,7 @@ bool decrypt_sensordata(message *m) {
 
     // decrypt memory blocks containing sensor data. skipjack is 64 bit (8 byte) blocks
     for (int i = 0; i < sizeof(m->s); i += 8) {
-        int ptrshift = i * 8;
+        int ptrshift = i;
         skipjack_dec((&m->s + ptrshift), row[0]);
     }
     return true;
