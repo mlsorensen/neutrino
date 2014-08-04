@@ -16,9 +16,8 @@
 #define __RF24_H__
 
 #include "RF24_config.h"
-#ifdef __ARM_ARCH_6__
+//#include "lib/RF24/compatibility.h"
 #include "compatibility.h"
-#endif
 
 /**
  * Power Amplifier level.
@@ -48,11 +47,9 @@ typedef enum { RF24_CRC_DISABLED = 0, RF24_CRC_8, RF24_CRC_16 } rf24_crclength_e
 class RF24
 {
 private:
-  uint8_t ce_pin; /**< "Chip Enable" pin, activates the RX or TX role */
-#ifdef __ARM_ARCH_6__
+  uint8_t ce_pin; /**< "Chip Enable" pin, activates the RX or TX role, unused on rpi */
   string spidevice;
   uint32_t spispeed;
-#endif
   uint8_t csn_pin; /**< SPI Chip select */
   bool wide_band; /* 2Mbs data rate in use? */
   bool p_variant; /* False for RF24L01 and true for RF24L01P */
@@ -242,12 +239,10 @@ public:
    * and send in the unique pins that this chip is connected to.
    *
    * @param _cepin The pin attached to Chip Enable on the RF module
-   * @param _cspin The pin attached to Chip Select
+   * @param _cspin The pin attached to Chip SPI chipSelect
    */
   RF24(uint8_t _cepin, uint8_t _cspin);
-#ifdef __ARM_ARCH_6__
   RF24(string _spidevice, uint32_t _spispeed, uint8_t _cepin);
-#endif
 
   /**
    * Begin operation of the chip
@@ -256,12 +251,12 @@ public:
    */
   void begin(void);
 
-  /**
-    * Reset confguration of the chip
-    *
-    * Call this to reset all registers
-    */
-   void resetcfg(void);
+ /**
+   * Reset confguration of the chip
+   *
+   * Call this to reset all registers
+   */
+  void resetcfg(void);
 
   /**
    * Start listening on the pipes opened for reading.

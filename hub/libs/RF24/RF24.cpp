@@ -14,19 +14,16 @@
 
 void RF24::csn(int mode)
 {
-  // Minimum ideal spi bus speed is 2x data rate
+  // Minimum ideal SPI bus speed is 2x data rate
   // If we assume 2Mbs data rate and 16Mhz clock, a
   // divider of 4 is the minimum we want.
   // CLK:BUS 8Mhz:2Mhz, 16Mhz:4Mhz, or 20Mhz:5Mhz
 #ifdef ARDUINO
-#ifdef __ARM_ARCH_7A__
-  spi->setBitOrder(MSBFIRST);
-  spi->setDataMode(spi_MODE0);
-  spi->setClockDivider(spi_CLOCK_DIV4);
-#endif
+//  spi->setBitOrder(MSBFIRST);
+//  spi->setDataMode(SPI_MODE0);
+//  spi->setClockDivider(SPI_CLOCK_DIV4);
 #endif
   digitalWrite(csn_pin,mode);
-  
 }
 
 /****************************************************************************/
@@ -241,15 +238,6 @@ void RF24::print_address_register(const char* name, uint8_t reg, uint8_t qty)
 
 /****************************************************************************/
 
-RF24::RF24(uint8_t _cepin, uint8_t _cspin):
-  ce_pin(_cepin), csn_pin(_cspin), wide_band(true), p_variant(false), 
-  payload_size(32), ack_payload_available(false), dynamic_payloads_enabled(false),
-  pipe0_reading_address(0)
-{
-
-}
-
-#ifdef __ARM_ARCH_6__
 RF24::RF24(string _spidevice, uint32_t _spispeed, uint8_t _cepin):
 spidevice( _spidevice) ,spispeed( _spispeed),ce_pin(_cepin), wide_band(true), p_variant(false),
   payload_size(32), ack_payload_available(false), dynamic_payloads_enabled(false),
@@ -257,7 +245,14 @@ spidevice( _spidevice) ,spispeed( _spispeed),ce_pin(_cepin), wide_band(true), p_
 {
 
 }
-#endif
+/****************************************************************************/
+
+RF24::RF24(uint8_t _cepin, uint8_t _cspin):
+  ce_pin(_cepin), csn_pin(_cspin), wide_band(true), p_variant(false), 
+  payload_size(32), ack_payload_available(false), dynamic_payloads_enabled(false),
+  pipe0_reading_address(0)
+{
+}
 
 /****************************************************************************/
 
@@ -322,6 +317,11 @@ static const char * const rf24_pa_dbm_e_str_P[] PROGMEM = {
 
 void RF24::printDetails(void)
 {
+
+  printf_P(PSTR("SPI device\t = %s\r\n"),spidevice.c_str() );
+  printf_P(PSTR("SPI speed\t = %d\r\n"),spispeed);
+  printf_P(PSTR("CE GPIO\t = %d\r\n"),ce_pin);
+	
   print_status(get_status());
 
   print_address_register(PSTR("RX_ADDR_P0-1"),RX_ADDR_P0,2);
@@ -340,32 +340,21 @@ void RF24::printDetails(void)
   printf_P(PSTR("Model\t\t = %s\r\n"),pgm_read_word(&rf24_model_e_str_P[isPVariant()]));
   printf_P(PSTR("CRC Length\t = %s\r\n"),pgm_read_word(&rf24_crclength_e_str_P[getCRCLength()]));
   printf_P(PSTR("PA Power\t = %s\r\n"),pgm_read_word(&rf24_pa_dbm_e_str_P[getPALevel()]));
-
-#ifdef __ARM_ARCH_6__
-  printf_P(PSTR("SPI device\t = %s\r\n"),spidevice.c_str() );
-  printf_P(PSTR("SPI speed\t = %d\r\n"),spispeed);
-  printf_P(PSTR("CE GPIO\t = %d\r\n"),ce_pin);
-#endif
 }
 
 /****************************************************************************/
 
 void RF24::begin(void)
 {
+  // Initialize pins
+  pinMode(ce_pin,OUTPUT);
 
-#ifdef __ARM_ARCH_7A__
-  spi = new SPI();
-  
-  // just to simulate arduino milis()
-  __start_timer();
-#endif
-
-#ifdef __ARM_ARCH_6__
 if ( spidevice == "/dev/spidev0.1" ) {
-    csn_pin=9;
+	csn_pin=9;
 } else {
-    csn_pin=8;
+	csn_pin=8;
 }
+  pinMode(csn_pin,OUTPUT);
 
   // Initialize SPI bus
   //spi->begin();
@@ -374,10 +363,7 @@ spi = new SPI();
         spi->setspeed(spispeed);
         spi->setbits(8);
         spi->init();
-#endif
 
-  pinMode(ce_pin,OUTPUT);
-  pinMode(csn_pin,OUTPUT);
 
   ce(LOW);
   csn(HIGH);
@@ -389,6 +375,9 @@ spi = new SPI();
   // Technically we require 4.5ms + 14us as a worst case. We'll just call it 5ms for good measure.
   // WARNING: Delay is based on P-variant whereby non-P *may* require different timing.
   delay( 5 ) ;
+
+  // Adjustments as per gcopeland fork  
+  //resetcfg();
 
   // Set 1500uS (minimum for 32B payload in ESB@250KBPS) timeouts, to make testing a little easier
   // WARNING: If this is ever lowered, either 250KBS mode with AA is broken or maximum packet
@@ -431,13 +420,12 @@ spi = new SPI();
   flush_tx();
 }
 
-#ifdef __ARCH_ARM_6
-void RF24::resetcfg(void){
-  write_register(0x00,0x0f);
-}
-#endif
-
 /****************************************************************************/
+
+
+void RF24::resetcfg(void){
+	write_register(0x00,0x0f);
+}
 
 void RF24::startListening(void)
 {
@@ -448,9 +436,11 @@ void RF24::startListening(void)
   if (pipe0_reading_address)
     write_register(RX_ADDR_P0, reinterpret_cast<const uint8_t*>(&pipe0_reading_address), 5);
 
+
+  // Adjustments as per gcopeland fork  
   // Flush buffers
-  //flush_rx(); // was not commented out for bbb
-  //flush_tx(); // was not commented out for bbb
+  //flush_rx();
+  //flush_tx();
 
   // Go!
   ce(HIGH);
@@ -473,6 +463,8 @@ void RF24::stopListening(void)
 void RF24::powerDown(void)
 {
   write_register(CONFIG,read_register(CONFIG) & ~_BV(PWR_UP));
+
+// Adjustments as per gcopeland fork  
   delayMicroseconds(150);
 }
 
@@ -481,6 +473,7 @@ void RF24::powerDown(void)
 void RF24::powerUp(void)
 {
   write_register(CONFIG,read_register(CONFIG) | _BV(PWR_UP));
+// Adjustments as per gcopeland fork  
   delayMicroseconds(150);
 }
 
@@ -493,17 +486,6 @@ bool RF24::write( const void* buf, uint8_t len )
   // Begin the write
   startWrite(buf,len);
 
-  // ------------
-  // At this point we could return from a non-blocking write, and then call
-  // the rest after an interrupt
-
-  // Instead, we are going to block here until we get TX_DS (transmission completed and ack'd)
-  // or MAX_RT (maximum retries, transmission failed).  Also, we'll timeout in case the radio
-  // is flaky and we get neither.
-
-  // IN the end, the send should be blocking.  It comes back in 60ms worst case, or much faster
-  // if I tighted up the retry logic.  (Default settings will be 1500us.
-  // Monitor the send
   uint8_t observe_tx;
   uint8_t status;
   uint32_t sent_at = __millis();
@@ -515,15 +497,6 @@ bool RF24::write( const void* buf, uint8_t len )
   }
   while( ! ( status & ( _BV(TX_DS) | _BV(MAX_RT) ) ) && ( __millis() - sent_at < timeout ) );
 
-  // The part above is what you could recreate with your own interrupt handler,
-  // and then call this when you got an interrupt
-  // ------------
-
-  // Call this when you get an interrupt
-  // The status tells us three things
-  // * The send was successful (TX_DS)
-  // * The send failed, too many retries (MAX_RT)
-  // * There is an ack packet waiting (RX_DR)
   bool tx_ok, tx_fail;
   whatHappened(tx_ok,tx_fail,ack_payload_available);
   
@@ -537,18 +510,13 @@ bool RF24::write( const void* buf, uint8_t len )
   {
     ack_payload_length = getDynamicPayloadSize();
     IF_SERIAL_DEBUG(printf("[AckPacket]/"));
-    IF_SERIAL_DEBUG(printf("\n%d", ack_payload_length));
+    IF_SERIAL_DEBUG(printfln(ack_payload_length,DEC));
   }
 
-  // Yay, we are done.
 
-#ifdef __ARCH_ARM_7A__
-  // Power down
-  powerDown();
-
-  // Flush buffers (Is this a relic of past experimentation, and not needed anymore??)
-  flush_tx();
-#endif
+  // Disable powerDown and flush_tx as per gcopeland fork
+  //powerDown();
+  //flush_tx();
 
   return result;
 }
@@ -558,14 +526,15 @@ void RF24::startWrite( const void* buf, uint8_t len )
 {
   // Transmitter power-up
   write_register(CONFIG, ( read_register(CONFIG) | _BV(PWR_UP) ) & ~_BV(PRIM_RX) );
-  //delayMicroseconds(150);
+// Adjustments as per gcopeland fork  
+// delayMicroseconds(150);
 
   // Send the payload
   write_payload( buf, len );
 
   // Allons!
   ce(HIGH);
-  delayMicroseconds(15);
+  delayMicroseconds(10);
   ce(LOW);
 }
 
@@ -688,21 +657,7 @@ void RF24::openReadingPipe(uint8_t child, uint64_t address)
 
   if (child <= 6)
   {
-#ifdef __ARCH_ARM_7A__
     // For pipes 2-5, only write the LSB
-    if ( child < 2 )
-      write_register(child_pipe[child], reinterpret_cast<const uint8_t*>(&address), 5);
-    else
-      write_register(child_pipe[child], reinterpret_cast<const uint8_t*>(&address), 1);
-
-    write_register(child_payload_size[child],payload_size);
-
-    // Note it would be more efficient to set all of the bits for all open
-    // pipes at once.  However, I thought it would make the calling code
-    // more simple to do it this way.
-    write_register(EN_RXADDR,read_register(EN_RXADDR) | _BV(child_pipe_enable[child]));
-#endif
-#ifdef __ARCH_ARM_6__
     if ( child < 2 )
       write_register(pgm_read_byte(&child_pipe[child]), reinterpret_cast<const uint8_t*>(&address), 5);
     else
@@ -714,7 +669,6 @@ void RF24::openReadingPipe(uint8_t child, uint64_t address)
     // pipes at once.  However, I thought it would make the calling code
     // more simple to do it this way.
     write_register(EN_RXADDR,read_register(EN_RXADDR) | _BV(pgm_read_byte(&child_pipe_enable[child])));
-#endif
   }
 }
 
