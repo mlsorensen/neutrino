@@ -40,7 +40,7 @@ uint64_t pipes[6];
 struct __attribute__((packed))
 sensordata {
     int8_t   addr;
-    int8_t   placeholder1; // future var (door ajar?)
+    bool     proximity; // is reed switch open?
     int8_t   placeholder2; // future var
     int16_t  tempc; // temp in centicelsius
     int16_t  humidity; // humidity in basis points (percent of percent)
