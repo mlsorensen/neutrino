@@ -27,11 +27,13 @@
 
 #define ENCRYPT_PIN A2
 
-#define PROXIMITY_PIN A1
+#define PROXIMITY_INT 0
+#define PROXIMITY_PIN 2
+#define BOUNCE_DURATION 20 
 
 #define RF_GOOD_LED 3
 #define RF_BAD_LED 4
-#define LO_BATT_LED 2
+#define LO_BATT_LED A1
 
 //prototypes
 
@@ -44,6 +46,8 @@ int getMyChannel();
 bool shouldEncrypt();
 bool keyIsEmpty(byte * key, int size);
 void generateKey(byte * key, int size);
+void proximityTrigger();
+void sendMessage();
 
 int myaddr = getMyAddr();
 // commented out until hardware supports channel pins
@@ -51,11 +55,14 @@ int myaddr = getMyAddr();
 int mychannel = 0;
 int32_t lastmillivolts = 0;
 
+volatile int proximitystate = HIGH;
+volatile unsigned long bounceTime=0;
+
 // this struct should always be a multiple of 64 bits so we can easily encrypt it (skipjack 64bit blocks)
 // data is passed as integers, therefore decimals are shifted where noted to maintain precision
 struct sensordata {
     int8_t   addr         = myaddr;
-    int8_t   placeholder1 = 0; // future var (door ajar?)
+    bool     proximity    = true; // future var (door ajar?)
     int8_t   placeholder2 = 0; // future var
     int16_t  tempc        = 0; // temp in centicelsius
     int16_t  humidity     = 0; // humidity in basis points (percent of percent)
@@ -134,9 +141,35 @@ void setup() {
     hsensor.begin();
     bsensor.begin(1);
     lastmillivolts = readVcc();
+
+    //TESTING: proximity switch interrupt
+    pinMode(PROXIMITY_PIN, INPUT_PULLUP);
+    attachInterrupt(PROXIMITY_INT, proximityTrigger, CHANGE);
+}
+
+void proximityTrigger() {
+    //sendMessage();
+    if (abs(millis() - bounceTime) > BOUNCE_DURATION) {
+    proximitystate = LOW;
+    digitalWrite(RF_GOOD_LED, HIGH);
+    bounceTime = millis();
+    }
 }
 
 void loop() {
+    sendMessage();
+
+    // power down for 58 seconds
+    for (int i = 0; i < 29; i++) {
+        LowPower.powerDown(SLEEP_2S, ADC_OFF, BOD_OFF);
+        //delay(2000);
+        if (proximitystate == LOW) {
+            break;
+        }
+    }
+}
+
+void sendMessage() {
     message m;
     // humidity, temp
     if (hsensor.sensorExists()) {
@@ -144,7 +177,7 @@ void loop() {
         m.s.humidity        = sidata.humidityBasisPoints;
         m.s.tempc           = sidata.celsiusHundredths;
     }
-    
+
     // pressure
     if (bsensor.sensorExists()) {
         // fall back to bosch sensor for temperature if necessary
@@ -152,12 +185,19 @@ void loop() {
             m.s.tempc = bsensor.getCelsiusHundredths();
         }
         m.s.pressuredp = bsensor.getPressurePascals() / 10;
-        
+
     }
-    
+
     // voltage was read after last radio send to get reading after high power draw
     m.s.millivolts = lastmillivolts;
-    
+
+    if (proximitystate == LOW) {
+        m.s.proximity = false;
+        digitalWrite(RF_GOOD_LED, LOW);
+        proximitystate = HIGH;
+        attachInterrupt(PROXIMITY_INT, proximityTrigger, CHANGE);
+    }
+
     // when encryption is disabled, we send the key. when it is enabled, we send the empty key
     if (shouldEncrypt()) {
         m.encrypted = true;
@@ -166,7 +206,7 @@ void loop() {
         hmac_md5(&hmac, &signaturekey, EEPROM_SIG_KEY_SIZE * 8, &m.s, 88);
         // populate the signature entry within sensor data, before we encrypt
         memcpy(&m.s.signature, &hmac, 5);
-        
+
         // encrypt memory blocks containing sensor data. skipjack is 64 bit (8 byte) blocks
         for (int i = 0; i < sizeof(m.s); i += 8) {
             int ptrshift = i * 8;
@@ -176,7 +216,7 @@ void loop() {
         memcpy(&m.enckey, &encryptionkey, EEPROM_ENC_KEY_SIZE);
         memcpy(&m.sigkey, &signaturekey, EEPROM_SIG_KEY_SIZE);
     }
-    
+
     radio.powerUp();
     delay(2);
     radio.stopListening();
@@ -184,23 +224,15 @@ void loop() {
     if (ok) {
         flash(RF_GOOD_LED);
     } else {
-        flash(RF_BAD_LED); 
+        flash(RF_BAD_LED);
     }
     lastmillivolts = readVcc();
     radio.startListening();
     radio.powerDown();
-    
+
     if (m.s.millivolts < 2200) {
         flash(LO_BATT_LED);
     }
-
-    // power down for 56 seconds
-    for (int i = 0; i < 7; i++) {
-        LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
-    }
-    // power down for 4 seconds (60 total)
-    LowPower.powerDown(SLEEP_4S, ADC_OFF, BOD_OFF);
-    
 }
 
 void flash(int pin) {
