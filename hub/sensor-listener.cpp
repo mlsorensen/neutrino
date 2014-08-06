@@ -296,7 +296,7 @@ void radio_init() {
     radio.setChannel(sensorhubid);
     radio.setPALevel(RF24_PA_MAX);
     radio.setDataRate(RF24_250KBPS);
-    radio.setRetries(30,30);
+    radio.setRetries(6,15);
 
     for(int i = 0; i < 6; i++) {
         uint64_t pipe = 0XFCFCFCFC00LL + (sensorhubid << 8) + i;
