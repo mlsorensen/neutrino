@@ -51,8 +51,7 @@ void sendMessage();
 
 int myaddr = getMyAddr();
 // commented out until hardware supports channel pins
-// int mychannel = getMyChannel();
-int mychannel = 0;
+int mychannel = getMyChannel();
 int32_t lastmillivolts = 0;
 
 volatile int proximitystate = HIGH;
@@ -81,7 +80,7 @@ struct message {
 };
 
 RF24 radio(8,9);
-const uint64_t pipe = 0xFCFCFCFC00LL + myaddr;
+const uint64_t pipe = 0xFCFCFCFC00LL + (mychannel << 8) + myaddr;
 //const uint64_t pipes[6] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL }; 
 BMP180 bsensor;
 SI7021 hsensor;
@@ -131,7 +130,7 @@ void setup() {
     }
   
     radio.begin();
-    radio.setRetries(10,10);
+    radio.setRetries(6, 15);
     radio.setChannel(mychannel);
     radio.setDataRate(RF24_250KBPS);
     radio.setPALevel(RF24_PA_MAX);
@@ -144,7 +143,7 @@ void setup() {
 
     //TESTING: proximity switch interrupt
     pinMode(PROXIMITY_PIN, INPUT_PULLUP);
-    attachInterrupt(PROXIMITY_INT, proximityTrigger, CHANGE);
+    attachInterrupt(PROXIMITY_INT, proximityTrigger, HIGH);
 }
 
 void proximityTrigger() {
@@ -355,7 +354,14 @@ int getMyChannel() {
     digitalWrite(CHANNEL_PIN_2, LOW);
     pinMode(CHANNEL_PIN_3, OUTPUT);
     digitalWrite(CHANNEL_PIN_3, LOW);
-    
+
+    for (int i = 0 ; i < result; i++) {
+        pulse(LO_BATT_LED);
+    } 
+
+    // we use channels 60-75
+    result += 60;
+
     return result;
 }
 
