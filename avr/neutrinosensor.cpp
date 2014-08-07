@@ -54,7 +54,7 @@ int myaddr = getMyAddr();
 int mychannel = getMyChannel();
 int32_t lastmillivolts = 0;
 
-volatile int proximitystate = HIGH;
+volatile bool proximitytrigger = false;
 volatile unsigned long bounceTime=0;
 
 // this struct should always be a multiple of 64 bits so we can easily encrypt it (skipjack 64bit blocks)
@@ -130,7 +130,7 @@ void setup() {
     }
   
     radio.begin();
-    radio.setRetries(6, 15);
+    radio.setRetries(6, 4);
     radio.setChannel(mychannel);
     radio.setDataRate(RF24_250KBPS);
     radio.setPALevel(RF24_PA_MAX);
@@ -147,11 +147,9 @@ void setup() {
 }
 
 void proximityTrigger() {
-    //sendMessage();
     if (abs(millis() - bounceTime) > BOUNCE_DURATION) {
-    proximitystate = LOW;
-    digitalWrite(RF_GOOD_LED, HIGH);
-    bounceTime = millis();
+        proximitytrigger = true;
+        bounceTime = millis();
     }
 }
 
@@ -159,10 +157,9 @@ void loop() {
     sendMessage();
 
     // power down for 58 seconds
-    for (int i = 0; i < 29; i++) {
-        LowPower.powerDown(SLEEP_2S, ADC_OFF, BOD_OFF);
-        //delay(2000);
-        if (proximitystate == LOW) {
+    for (int i = 0; i < 15; i++) {
+        LowPower.powerDown(SLEEP_4S, ADC_OFF, BOD_OFF);
+        if (proximitytrigger == true) {
             break;
         }
     }
@@ -190,12 +187,16 @@ void sendMessage() {
     // voltage was read after last radio send to get reading after high power draw
     m.s.millivolts = lastmillivolts;
 
-    if (proximitystate == LOW) {
-        m.s.proximity = false;
-        digitalWrite(RF_GOOD_LED, LOW);
-        proximitystate = HIGH;
+    //if (proximitytrigger == true) {
+    //    m.s.proximity = false;
+        if (digitalRead(PROXIMITY_PIN) == LOW) {
+            m.s.proximity = true;
+        } else {
+            m.s.proximity = false;
+        }
+        proximitytrigger = false;
         attachInterrupt(PROXIMITY_INT, proximityTrigger, CHANGE);
-    }
+    //}
 
     // when encryption is disabled, we send the key. when it is enabled, we send the empty key
     if (shouldEncrypt()) {

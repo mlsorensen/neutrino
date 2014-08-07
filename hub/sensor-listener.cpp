@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
                 printf("encryption key is %s\n",enckey);
                 printf("hmac key is %x%x%x%x\n", m.sigkey[0], m.sigkey[1], m.sigkey[2], m.sigkey[3]);
                 printf("encryption is %s\n", m.encrypted ? "true" : "false");
-                printf("reed switch is %s\n", m.s.proximity ? "untriggered" : "triggered");
+                printf("reed switch is %s\n", m.s.proximity ? "closed" : "open");
                 printf("Temperature is %.2f F\n", ctof(m.s.tempc));
                 printf("Temperature is %.2f C\n", (float)m.s.tempc / 100);
                 printf("pressure is %d Pa\n", m.s.pressuredp * 10);
