@@ -16,6 +16,10 @@
 #define EEPROM_SIG_KEY_ADDR 0x0a
 #define EEPROM_SIG_KEY_SIZE 4
 
+#define SIG_SIZE 6
+
+#define PAYLOAD_SIZE 17
+
 #define CHANNEL_PIN_0 0
 #define CHANNEL_PIN_1 1
 #define CHANNEL_PIN_2 10
@@ -47,7 +51,8 @@ bool shouldEncrypt();
 bool keyIsEmpty(byte * key, int size);
 void generateKey(byte * key, int size);
 void proximityTrigger();
-void sendMessage();
+void sendDataMessage();
+void sendPairingMessage();
 
 int myaddr = getMyAddr();
 // commented out until hardware supports channel pins
@@ -61,22 +66,46 @@ volatile unsigned long bounceTime=0;
 // data is passed as integers, therefore decimals are shifted where noted to maintain precision
 struct sensordata {
     int8_t   addr         = myaddr;
-    bool     proximity    = true; // future var (door ajar?)
-    int8_t   placeholder2 = 0; // future var
+    bool     proximity    = true; // sensor closed or open
     int16_t  tempc        = 0; // temp in centicelsius
     int16_t  humidity     = 0; // humidity in basis points (percent of percent)
     uint16_t pressuredp   = 0; // pressure in decapascals
     uint16_t millivolts   = 0; // battery voltage millivolts
-    uint8_t  signature[5] = {0x00, 0x00, 0x00, 0x00, 0x00}; //truncated md5 of sensor data
+    uint8_t  signature[SIG_SIZE] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; //truncated md5 of sensor data
 };
 
-// 32 bytes. Want to keep this <= 32 bytes so that it will fit in one radio packet
-struct message {
-    int8_t addr = myaddr; // 1 byte
-    bool encrypted = false; // 1 byte
+struct pairingdata {
     byte enckey[EEPROM_ENC_KEY_SIZE] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; // 10 bytes
     byte sigkey[EEPROM_SIG_KEY_SIZE] = {0x00, 0x00, 0x00, 0x00}; // 4 bytes
-    sensordata s; // 16 bytes
+    int16_t padding = 0; // 2 bytes
+};
+
+/* keep messages small, increases radio range. Currently 17 bytes (PAYLOAD_SIZE).
+
+header is one byte that represents the following:
+
+MSB  00000000  LSB
+     RRRAAAMM
+
+MM - message type
+     00 - contains sensor data message
+     01 - pairing, contains keys message
+     10 - reserved
+     11 - reserved
+
+AAA - sensor address (if applicable)
+
+RRR - reserved
+*/
+
+struct sensordatamessage {
+    int8_t header = (myaddr << 2) + 0x00; // 1 byte
+    sensordata data; // 16 bytes, will encrypt
+};
+
+struct sensorpairingmessage {
+    int8_t header = (myaddr << 2) + 0x01; // 1 byte
+    pairingdata data; // 16 bytes unencrypted
 };
 
 RF24 radio(8,9);
@@ -131,6 +160,7 @@ void setup() {
   
     radio.begin();
     radio.setRetries(6, 4);
+    radio.setPayloadSize(PAYLOAD_SIZE);
     radio.setChannel(mychannel);
     radio.setDataRate(RF24_250KBPS);
     radio.setPALevel(RF24_PA_MAX);
@@ -154,52 +184,59 @@ void proximityTrigger() {
 }
 
 void loop() {
-    sendMessage();
+    if (shouldEncrypt()) {
+        sendDataMessage();
+    } else {
+        sendPairingMessage();
+    }
 
-    // power down for 58 seconds
-    for (int i = 0; i < 15; i++) {
-        LowPower.powerDown(SLEEP_4S, ADC_OFF, BOD_OFF);
-        if (proximitytrigger == true) {
-            break;
-        }
+    // power down for 56 seconds
+    for (int i = 0; i < 7; i++) {
+        LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+// this seems unnecessary, as interrupt breaks the loop... ?
+//        if (proximitytrigger == true) {
+//            break;
+//        }
     }
 }
 
-void sendMessage() {
-    message m;
+void sendDataMessage() {
+    sensordatamessage m;
     // humidity, temp
     if (hsensor.sensorExists()) {
         si7021_env sidata = hsensor.getHumidityAndTemperature();
-        m.s.humidity        = sidata.humidityBasisPoints;
-        m.s.tempc           = sidata.celsiusHundredths;
+        m.data.humidity        = sidata.humidityBasisPoints;
+        m.data.tempc           = sidata.celsiusHundredths;
     }
 
     // pressure
     if (bsensor.sensorExists()) {
         // fall back to bosch sensor for temperature if necessary
         if(! hsensor.sensorExists()) {
-            m.s.tempc = bsensor.getCelsiusHundredths();
+            m.data.tempc = bsensor.getCelsiusHundredths();
         }
-        m.s.pressuredp = bsensor.getPressurePascals() / 10;
+        m.data.pressuredp = bsensor.getPressurePascals() / 10;
 
     }
 
     // voltage was read after last radio send to get reading after high power draw
-    m.s.millivolts = lastmillivolts;
+    m.data.millivolts = lastmillivolts;
 
-    //if (proximitytrigger == true) {
-    //    m.s.proximity = false;
-        if (digitalRead(PROXIMITY_PIN) == LOW) {
-            m.s.proximity = true;
-        } else {
-            m.s.proximity = false;
-        }
-        proximitytrigger = false;
-        attachInterrupt(PROXIMITY_INT, proximityTrigger, CHANGE);
-    //}
+    if (digitalRead(PROXIMITY_PIN) == LOW) {
+        m.data.proximity = true;
+    } else {
+        m.data.proximity = false;
+    }
+    proximitytrigger = false;
+    // THIS SEEMS WRONG...CRUFT. DELETE IT IF THIS DOESN'T BREAK ANYTHING
+    //attachInterrupt(PROXIMITY_INT, proximityTrigger, CHANGE);
 
     // when encryption is disabled, we send the key. when it is enabled, we send the empty key
-    if (shouldEncrypt()) {
+    /*
+    DELETE THIS WHEN WE HAVE NEW MESSAGES WORKING
+    if (! shouldEncrypt()) {
+        
+
         m.encrypted = true;
         // hmac the first 88 bits of the sensor data (everything but the signature itself)
         uint8_t hmac[16];
@@ -215,23 +252,52 @@ void sendMessage() {
     } else {
         memcpy(&m.enckey, &encryptionkey, EEPROM_ENC_KEY_SIZE);
         memcpy(&m.sigkey, &signaturekey, EEPROM_SIG_KEY_SIZE);
+    }*/
+
+    uint8_t hmac[16];
+    hmac_md5(&hmac, &signaturekey, EEPROM_SIG_KEY_SIZE * 8, &m.data, 88);
+    memcpy(&m.data.signature, &hmac, SIG_SIZE);
+    // encrypt memory blocks containing sensor data. skipjack is 64 bit (8 byte) blocks
+    for (int i = 0; i < sizeof(m.data); i += 8) {
+        int ptrshift = i * 8;
+        skipjack_enc((&m.data + ptrshift),&encryptionkey);
     }
 
     radio.powerUp();
     delay(2);
     radio.stopListening();
     bool ok = radio.write(&m, sizeof m);
+    radio.startListening();
+    radio.powerDown();
+
     if (ok) {
         flash(RF_GOOD_LED);
     } else {
         flash(RF_BAD_LED);
     }
     lastmillivolts = readVcc();
+
+    if (m.data.millivolts < 2200) {
+        flash(LO_BATT_LED);
+    }
+}
+
+void sendPairingMessage() {
+    sensorpairingmessage m;
+    memcpy(&m.data.enckey, &encryptionkey, EEPROM_ENC_KEY_SIZE);
+    memcpy(&m.data.sigkey, &signaturekey, EEPROM_SIG_KEY_SIZE);
+
+    radio.powerUp();
+    delay(2);
+    radio.stopListening();
+    bool ok = radio.write(&m, sizeof m);
     radio.startListening();
     radio.powerDown();
 
-    if (m.s.millivolts < 2200) {
-        flash(LO_BATT_LED);
+    if (ok) {
+        flash(RF_GOOD_LED);
+    } else {
+        flash(RF_BAD_LED);
     }
 }
 
