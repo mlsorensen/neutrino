@@ -23,59 +23,18 @@ int main(int argc, char** argv) {
     while(1) {
         if (radio.available()) {
             fprintf(stderr, "got message on radio\n");
-            message m;
-            bzero(m.enckey, SKIPJACK_KEY_SIZE);
-            bool nread = radio.read(&m, sizeof m);
+            message message;
+            bool nread = radio.read(&message, sizeof message);
+            
+            // parse message header
+            int messagetype = 0x11111100 & message.header;
+            int sensoraddr  = (0x11100011 & message.header) >> 2;
+
             if(nread) {
-                if(m.encrypted) {
-                    // decrypt sensor data before continuing
-                    fprintf(stderr, "decrypting message\n");
-                    if (decrypt_sensordata(&m) == false || m.enckey == 0x00) {
-                        printf("message from sensor address %d was encrypted and unable to decrypt\n", m.addr);
-                        continue;
-                    }
-                    // check signature before continuing
-                    fprintf(stderr, "checking signature for sensor data\n");
-                    if (check_sensordata_signature(&m) == false || m.sigkey == 0x00) {
-                        printf("unable to verify signature on decrypted data from sensor %d, ignoring\n", m.addr);
-                        continue;
-                    }
-                } else {
-                    // if unencrypted and sensor is not known about, add it if we are in discovery mode. If we are not, simply warn and loop.
-                    if(sensor_is_known(m.addr) == false && listener_should_discover() == false) {
-                        fprintf(stderr, "Received unencrypted communication from sensor addr %d, and we are not in discovery mode. Dropping broadcast\n", m.addr);
-                        continue;
-                    } 
-                }
-
-                // encryption key human readable
-                char enckey[8];
-                bzero(enckey, 8);
-                for (int i=0; i<sizeof(m.enckey); i++) {
-                    char * byte = (char*)malloc(2);
-                    sprintf(byte,"%x",m.enckey[i]);
-                    strncat(enckey, byte, 2);
-                    free(byte);
-                }                
-
-                printf("radio at address %d :\n",m.addr);
-                printf("encryption key is %s\n",enckey);
-                printf("hmac key is %x%x%x%x\n", m.sigkey[0], m.sigkey[1], m.sigkey[2], m.sigkey[3]);
-                printf("encryption is %s\n", m.encrypted ? "true" : "false");
-                printf("reed switch is %s\n", m.s.proximity ? "closed" : "open");
-                printf("Temperature is %.2f F\n", ctof(m.s.tempc));
-                printf("Temperature is %.2f C\n", (float)m.s.tempc / 100);
-                printf("pressure is %d Pa\n", m.s.pressuredp * 10);
-                printf("humidity is %.2f%\n", (float)m.s.humidity / 100);
-                printf("voltage is %.3f \n", (float)m.s.millivolts / 1000);
-                printf("size of w is %lu\n", sizeof m);
-
-                if (strlen(zabbixserver) > 0 && strlen(zabbixclient) > 0) {
-                    publish_zabbix(&m);
-                }
-
-                if (insert_neutrino_data(&m) == 0) {
-                    fprintf(stderr, "inserted data for node %d, sensorhub %d into db\n", m.addr, sensorhubid);
+                if(messagetype == 0) {
+                    handle_sensor_message(&message);
+                } else if (messagetype == 1) {
+                    handle_pairing_message(&message, sensoraddr);
                 }
             } else {
                 printf("!!!!!!\n failed to read from radio\n !!!!!!\n");
@@ -92,6 +51,85 @@ int main(int argc, char** argv) {
 
 float ctof (int16_t c) {
     return c * .018 + 32;
+}
+
+void handle_sensor_message(message * message) {
+    sensordata data;
+    memcpy(&data, &message->data, sizeof message->data);
+    // decrypt sensor data before continuing
+    fprintf(stderr, "decrypting message\n");
+    if (decrypt_sensordata(&data) == false) {
+        printf("message from sensor address %d was encrypted and unable to decrypt\n", data.addr);
+        return;
+    }
+    // check signature before continuing
+    fprintf(stderr, "checking signature for sensor data\n");
+    if (check_sensordata_signature(&data) == false) {
+        printf("unable to verify signature on decrypted data from sensor %d, ignoring\n", data.addr);
+        return;
+    }
+
+    printf("radio at address %d :\n", data.addr);
+    //printf("encryption key is %s\n",enckey);
+    //printf("hmac key is %x%x%x%x\n", m.sigkey[0], m.sigkey[1], m.sigkey[2], m.sigkey[3]);
+    //printf("encryption is %s\n", m.encrypted ? "true" : "false");
+    printf("reed switch is %s\n", data.proximity ? "closed" : "open");
+    printf("Temperature is %.2f F\n", ctof(data.tempc));
+    printf("Temperature is %.2f C\n", (float)data.tempc / 100);
+    printf("pressure is %d Pa\n", data.pressuredp * 10);
+    printf("humidity is %.2f%\n", (float)data.humidity / 100);
+    printf("voltage is %.3f \n", (float)data.millivolts / 1000);
+    printf("size of message is %lu\n", sizeof message);
+
+    if (strlen(zabbixserver) > 0 && strlen(zabbixclient) > 0) {
+        publish_zabbix(&data);
+    }
+
+    if (insert_neutrino_data(&data) == 0) {
+        fprintf(stderr, "inserted data for node %d, sensorhub %d into db\n", data.addr, sensorhubid);
+    } else {
+        fprintf(stderr, "failed to insert data into db\n");
+    }
+}
+
+void handle_pairing_message(message * message, int addr) {
+    pairingdata pdata;
+    memcpy(&pdata, &message->data, sizeof message->data);
+
+    // encryption key human readable
+    char enckey[8];
+    bzero(enckey, 8);
+    for (int i=0; i<sizeof(pdata.enckey); i++) {
+        char * byte = (char*)malloc(2);
+        sprintf(byte,"%x",pdata.enckey[i]);
+        strncat(enckey, byte, 2);
+        free(byte);
+    }
+
+    fprintf(stderr, "pairing message received\n");
+    printf("encryption key is %s\n",enckey);
+    printf("hmac key is %x%x%x%x\n", pdata.sigkey[0], pdata.sigkey[1], pdata.sigkey[2], pdata.sigkey[3]);
+
+    // if we are in discovery mode, save the keys, otherwise, ignore
+    if (listener_should_discover()) {
+        MYSQL *conn;
+        char sql[256];
+        conn = mysql_init(NULL);
+        if (!mysql_real_connect(conn, mysqlserver, mysqluser, mysqlpass, mysqldb, 0, NULL, 0)) {
+            fprintf(stderr, "Cant connect to database: %s\n", mysql_error(conn));
+            exit(1);
+        } else {
+            fprintf(stdout, "Connected to database\n");
+        }
+        sprintf(sql,"INSERT IGNORE INTO sensor (sensor_address,sensor_hub_id,sensor_encryption_key,sensor_signature_key) VALUES (%d, %d, '%s','%s')", addr, sensorhubid, pdata.enckey, pdata.sigkey);
+        if (mysql_query(conn, sql)) {
+            fprintf(stderr, "SQL error on sensor insert: %s\n", mysql_error(conn));
+            return;
+        }
+    } else {
+        fprintf(stderr, "sensor hub not in discovery mode, skipping\n");
+    }
+    
 }
 
 bool sensor_is_known(int sensoraddr) {
@@ -166,12 +204,12 @@ bool listener_should_discover() {
     return false;
 }
 
-bool decrypt_sensordata(message *m) {
+bool decrypt_sensordata(sensordata *data) {
     // look up encryption key in db
     char sql[256];
     MYSQL_ROW row;
 
-    sprintf(sql,"SELECT sensor_encryption_key from sensor where sensor_address=%d and sensor_hub_id=%d", m->addr, sensorhubid);
+    sprintf(sql,"SELECT sensor_encryption_key from sensor where sensor_address=%d and sensor_hub_id=%d", data->addr, sensorhubid);
     row = sql_select_row(sql);
 
     if (row == NULL) {
@@ -191,19 +229,19 @@ bool decrypt_sensordata(message *m) {
     fprintf(stderr, "found encryption key %s in database\n", enckey);
 
     // decrypt memory blocks containing sensor data. skipjack is 64 bit (8 byte) blocks
-    for (int i = 0; i < sizeof(m->s); i += 8) {
+    for (int i = 0; i < sizeof(*data); i += 8) {
         int ptrshift = i;
-        skipjack_dec((&m->s + ptrshift), row[0]);
+        skipjack_dec((data + ptrshift), row[0]);
     }
     return true;
 }
 
-bool check_sensordata_signature(message *m) {
+bool check_sensordata_signature(sensordata *data) {
     // look up hmac key in db
     char sql[256];
     MYSQL_ROW row;
 
-    sprintf(sql,"SELECT sensor_signature_key from sensor where sensor_address=%d and sensor_hub_id=%d", m->addr, sensorhubid);
+    sprintf(sql,"SELECT sensor_signature_key from sensor where sensor_address=%d and sensor_hub_id=%d", data->addr, sensorhubid);
     row = sql_select_row(sql);
 
     if (row == NULL) {
@@ -214,10 +252,10 @@ bool check_sensordata_signature(message *m) {
     fprintf(stderr, "found hmac key '%s' '%x%x%x%x' in database\n", row[0], row[0][0], row[0][1], row[0][2], row[0][3]);
 
     uint8_t hmac[SIGNATURE_SIZE];
-    hmac_md5(&hmac, row[0], SIGNATURE_KEY_SIZE*8, &m->s, 88);
+    hmac_md5(&hmac, row[0], SIGNATURE_KEY_SIZE*8, data, 88);
 
-    if(memcmp(hmac, m->s.signature, SIGNATURE_SIZE) != 0) {
-        fprintf(stderr, "signature verification failure, '%x%x%x%x%x' != '%x%x%x%x%x'\n", hmac[0], hmac[1], hmac[2], hmac[3], hmac[4], m->s.signature[0], m->s.signature[1], m->s.signature[2], m->s.signature[3], m->s.signature[4] );
+    if(memcmp(hmac, data->signature, SIGNATURE_SIZE) != 0) {
+        fprintf(stderr, "signature verification failure, '%x%x%x%x%x%x' != '%x%x%x%x%x%x'\n", hmac[0], hmac[1], hmac[2], hmac[3], hmac[4], hmac[5], data->signature[0], data->signature[1], data->signature[2], data->signature[3], data->signature[4], data->signature[5] );
         return false;
     }
 
@@ -225,7 +263,7 @@ bool check_sensordata_signature(message *m) {
     return true;
 }
 
-int insert_neutrino_data(message *m) {
+int insert_neutrino_data(sensordata *data) {
     char sql[256];
     int resultcode  = 0;
     unsigned int sensorid = 0;
@@ -240,23 +278,15 @@ int insert_neutrino_data(message *m) {
         fprintf(stdout, "Connected to database\n");
     }
 
-    // ensure sensor is in sensor table
-    sprintf(sql,"INSERT IGNORE INTO sensor (sensor_address,sensor_hub_id,sensor_encryption_key,sensor_signature_key) VALUES (%d, %d, '%s','%s')", m->addr, sensorhubid, m->enckey, m->sigkey);
-    if (mysql_query(conn, sql)) {
-        fprintf(stderr, "SQL error on sensor insert: %s\n", mysql_error(conn));
-        return -1;
-    }
-    bzero(sql, 256);
-
     // get sensor's db id
-    sensorid = get_sensor_id(conn, m->addr, sensorhubid);
+    sensorid = get_sensor_id(conn, data->addr, sensorhubid);
     if (sensorid == 0) {
         return -1;
     }
 
     // add data to data table
     sprintf(sql,"insert into data (sensor_id, voltage, fahrenheit, celsius, pascals, humidity) values (%u,%.3f,%.2f,%.2f,%ld,%.2f);",
-                sensorid, (float)m->s.millivolts/1000, ctof(m->s.tempc) ,(float)m->s.tempc/100, (long)m->s.pressuredp * 10, (float)m->s.humidity/100);
+                sensorid, (float)data->millivolts/1000, ctof(data->tempc) ,(float)data->tempc/100, (long)data->pressuredp * 10, (float)data->humidity/100);
     if (mysql_query(conn, sql)) {
         fprintf(stderr, "SQL error on data insert: %s\n", mysql_error(conn));
         return -1;
@@ -296,6 +326,7 @@ void radio_init() {
     radio.setChannel(sensorhubid);
     radio.setPALevel(RF24_PA_MAX);
     radio.setDataRate(RF24_250KBPS);
+    radio.setPayloadSize(PAYLOAD_SIZE);
     radio.setRetries(6,15);
 
     for(int i = 0; i < 6; i++) {
@@ -342,38 +373,37 @@ bool zabbix_send(const char * zkey, const char * zvalue) {
     close(sockfd);
 }
 
-bool publish_zabbix(message *m) {
+bool publish_zabbix(sensordata *data) {
     ostringstream zkey;
     ostringstream zvalue;
 
-    zkey << "neutrino." << (int)m->addr << ".temperature.fahrenheit";
-    zvalue << std::fixed << std::setprecision(2) << ctof(m->s.tempc);
+    zkey << "neutrino." << (int)data->addr << ".temperature.fahrenheit";
+    zvalue << std::fixed << std::setprecision(2) << ctof(data->tempc);
     zabbix_send(zkey.str().c_str(), zvalue.str().c_str());
 
     zkey.str("");
     zvalue.str("");
-    zkey << "neutrino." << (int)m->addr << ".temperature.celsius";
-    zvalue << std::fixed << std::setprecision(2) << (float)m->s.tempc/100;
+    zkey << "neutrino." << (int)data->addr << ".temperature.celsius";
+    zvalue << std::fixed << std::setprecision(2) << (float)data->tempc/100;
     zabbix_send(zkey.str().c_str(), zvalue.str().c_str());
 
     zkey.str("");
     zvalue.str("");
-    zkey << "neutrino." << (int)m->addr << ".pressure";
-    zvalue << (long)m->s.pressuredp * 10;
+    zkey << "neutrino." << (int)data->addr << ".pressure";
+    zvalue << (long)data->pressuredp * 10;
     zabbix_send(zkey.str().c_str(), zvalue.str().c_str());
 
     zkey.str("");
     zvalue.str("");
-    zkey << "neutrino." << (int)m->addr << ".voltage";
-    zvalue << std::fixed << std::setprecision(3) << (float)m->s.millivolts/1000;
+    zkey << "neutrino." << (int)data->addr << ".voltage";
+    zvalue << std::fixed << std::setprecision(3) << (float)data->millivolts/1000;
     zabbix_send(zkey.str().c_str(), zvalue.str().c_str());
 
     zkey.str("");
     zvalue.str("");
-    zkey << "neutrino." << (int)m->addr << ".humidity";
-    zvalue << std::fixed << std::setprecision(2) << (float)m->s.humidity/100;
+    zkey << "neutrino." << (int)data->addr << ".humidity";
+    zvalue << std::fixed << std::setprecision(2) << (float)data->humidity/100;
     zabbix_send(zkey.str().c_str(), zvalue.str().c_str());
-    
 }
 
 void usage() {
