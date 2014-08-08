@@ -7,7 +7,8 @@
 
 #define SKIPJACK_KEY_SIZE 10
 #define SIGNATURE_KEY_SIZE 4
-#define SIGNATURE_SIZE 5
+#define SIGNATURE_SIZE 6
+#define PAYLOAD_SIZE 17
 
 using namespace libconfig;
 
@@ -41,7 +42,6 @@ struct __attribute__((packed))
 sensordata {
     int8_t   addr;
     bool     proximity; // is reed switch open?
-    int8_t   placeholder2; // future var
     int16_t  tempc; // temp in centicelsius
     int16_t  humidity; // humidity in basis points (percent of percent)
     uint16_t pressuredp; // pressure in decapascals
@@ -49,30 +49,63 @@ sensordata {
     uint8_t  signature[SIGNATURE_SIZE]; //truncated md5 of sensor data
 };
 
-// struct message = 28 bytes. Want to keep this <= 32 bytes so that it will fit in one radio message
+struct __attribute__((packed))
+pairingdata {
+    char enckey[SKIPJACK_KEY_SIZE]; // 10 bytes
+    char sigkey[SIGNATURE_KEY_SIZE]; // 4 bytes
+    int16_t padding; // 2 bytes
+};
+
+/* keep messages small, increases radio range. Currently 17 bytes (PAYLOAD_SIZE).
+
+header is one byte that represents the following:
+
+MSB  00000000  LSB
+     RRRAAAMM
+
+MM - message type
+     00 - contains sensor data message
+     01 - pairing, contains keys message
+     10 - reserved
+     11 - reserved
+
+AAA - sensor address (if applicable)
+
+RRR - reserved
+*/
+
 struct message {
-    int8_t addr;
-    bool encrypted;
-    char enckey[SKIPJACK_KEY_SIZE];
-    char sigkey[SIGNATURE_KEY_SIZE];
-    sensordata s;
+    int8_t header;
+    char data[PAYLOAD_SIZE - 1];
+};
+
+struct sensordatamessage {
+    int8_t header; // 1 byte
+    sensordata data; // 16 bytes, will encrypt
+};
+
+struct sensorpairingmessage {
+    int8_t header; // 1 byte
+    pairingdata data; // 16 bytes unencrypted
 };
 
 //prototypes
 void radio_init();
-void get_args(int argc, char *argv[]);
+void get_args(int argc, char * argv[]);
 void usage();
 bool zabbix_send(const char * key, const char * value);
-bool publish_zabbix(message *m);
-int insert_neutrino_data(message *m);
+bool publish_zabbix(sensordata * data);
+int insert_neutrino_data(sensordata * data);
 float ctof(int16_t c);
-bool decrypt_sensordata(message *m);
-bool check_sensordata_signature(message *m);
+bool decrypt_sensordata(sensordata * data);
+bool check_sensordata_signature(sensordata * data);
 bool encryption_key_is_empty(char * key);
 bool sensor_is_known(int sensorid);
 bool listener_should_discover();
-unsigned int get_sensor_id(MYSQL *conn, int sensorid, int sensorhubid);
+unsigned int get_sensor_id(MYSQL * conn, int sensorid, int sensorhubid);
 MYSQL_ROW sql_select_row(char * sql);
+void handle_sensor_message(message * message);
+void handle_pairing_message(message * message, int addr);
 
 
 #endif
