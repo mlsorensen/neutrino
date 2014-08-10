@@ -30,10 +30,10 @@ public:
 	SPI();
 	uint8_t transfer(uint8_t tx_);
 	virtual ~SPI();
-    void init();
-    void setdevice( string devicefile );
-    void setbits( uint8_t bits );
-    void setspeed( uint32_t speed );
+	void init();	
+	void setdevice( string devicefile );
+	void setbits( uint8_t bits );
+	void setspeed( uint32_t speed );
 
 private:
 
@@ -46,6 +46,7 @@ private:
 	// Set SPI speed
 	uint32_t speed;
 	int fd;
+
 };
 
 #endif	/* SPI_H */
