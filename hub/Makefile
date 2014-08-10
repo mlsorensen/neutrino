@@ -1,12 +1,18 @@
 CPP        = g++
 CC         = gcc
 CFLAGS     = -O3
-LIBINC     = $(shell for i in `ls libs`; do echo -I libs/$$i; done)
+LIBINC     = $(shell for i in `ls libs | grep -v spi | grep -v RF24`; do echo -I libs/$$i; done)
 MYSQLFLAGS = $(shell mysql_config --cflags)
 MYSQLLIBS  = $(shell mysql_config --libs)
 PROG       = sensor-listener
 BUILDDIR   = build
-__ARM_ARCH_6__ = 1
+
+# build rf24 for beaglebone or rpi, depending on arch
+PLATFORM   = $(shell gcc -dM -E - < /dev/null | grep -q ARM_ARCH_6 && echo rpi || echo bbb)
+$(info "SELECTED PLATFORM $(PLATFORM)")
+
+LIBINC += -I libs/RF24-$(PLATFORM) -I libs/spi-$(PLATFORM)
+
 $(shell if [ ! -e $(BUILDDIR) ]; then mkdir $(BUILDDIR); fi)
 
 all: $(PROG)
@@ -29,14 +35,14 @@ $(BUILDDIR)/md5_sbox.o: libs/md5/md5_sbox.c
 $(BUILDDIR)/b64encode.o: libs/base64/b64encode.c
 	$(CC) $(CFLAGS) -c $< -o $@ $(LIBINC)
 
-$(BUILDDIR)/RF24.o: libs/RF24/RF24.cpp
-	$(CPP) $(CFLAGS) -c libs/RF24/RF24.cpp -o $@ $(LIBINC)
+$(BUILDDIR)/RF24.o: libs/RF24-$(PLATFORM)/RF24.cpp
+	$(CPP) $(CFLAGS) -c libs/RF24-$(PLATFORM)/RF24.cpp -o $@ $(LIBINC)
 
 $(BUILDDIR)/gpio.o: libs/gpio/gpio.cpp
 	$(CPP) $(CFLAGS) -c libs/gpio/gpio.cpp -o $@ $(LIBINC)
 
-$(BUILDDIR)/spi.o: libs/spi/spi.cpp
-	$(CPP) $(CFLAGS) -c libs/spi/spi.cpp -o $@ $(LIBINC)
+$(BUILDDIR)/spi.o: libs/spi-$(PLATFORM)/spi.cpp
+	$(CPP) $(CFLAGS) -c libs/spi-$(PLATFORM)/spi.cpp -o $@ $(LIBINC)
 
 $(BUILDDIR)/compatibility.o: libs/compatibility/compatibility.c
 	$(CC) $(CFLAGS) -c libs/compatibility/compatibility.c -o $@ $(LIBINC)
