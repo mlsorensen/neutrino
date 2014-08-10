@@ -1,0 +1,21 @@
+#!/bin/bash
+
+if gcc -dM -E - < /dev/null | grep -q ARM_ARCH_6; then
+    PINS=(19 22 23 24 20 21)
+else
+    PINS=(30 31 60 51 15 14)
+fi
+
+for i in ${PINS[@]}; do
+    if [ ! -e /sys/class/gpio/gpio${i} ]; then
+        echo $i > /sys/class/gpio/export
+    fi
+
+    echo out > /sys/class/gpio/gpio${i}/direction
+    echo "testing ${i}"
+    echo 1 > /sys/class/gpio/gpio${i}/value
+    sleep 3
+    echo 0 > /sys/class/gpio/gpio${i}/value
+    echo "done"
+    sleep 1
+done
