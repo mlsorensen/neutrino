@@ -262,7 +262,7 @@ bool check_sensordata_signature(sensordata *data) {
     fprintf(stderr, "found hmac key '%s' '%x%x%x%x' in database\n", row[0], row[0][0], row[0][1], row[0][2], row[0][3]);
 
     uint8_t hmac[SIGNATURE_SIZE];
-    hmac_md5(&hmac, row[0], SIGNATURE_KEY_SIZE*8, data, (PAYLOAD_SIZE - 2 ) * 8);
+    hmac_md5(&hmac, row[0], SIGNATURE_KEY_SIZE*8, data, 80);
 
     if(memcmp(hmac, data->signature, SIGNATURE_SIZE) != 0) {
         fprintf(stderr, "signature verification failure, '%x%x%x%x%x%x' != '%x%x%x%x%x%x'\n", hmac[0], hmac[1], hmac[2], hmac[3], hmac[4], hmac[5], data->signature[0], data->signature[1], data->signature[2], data->signature[3], data->signature[4], data->signature[5] );
