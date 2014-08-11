@@ -40,7 +40,7 @@ uint64_t pipes[6];
 // this struct should always be a multiple of 64 bits so we can easily encrypt it (skipjack 64bit blocks)
 struct __attribute__((packed))
 sensordata {
-    int8_t   addr;
+    uint8_t   addr;
     bool     proximity; // is reed switch open?
     int16_t  tempc; // temp in centicelsius
     int16_t  humidity; // humidity in basis points (percent of percent)
@@ -51,8 +51,8 @@ sensordata {
 
 struct __attribute__((packed))
 pairingdata {
-    char enckey[SKIPJACK_KEY_SIZE]; // 10 bytes
-    char sigkey[SIGNATURE_KEY_SIZE]; // 4 bytes
+    unsigned char enckey[SKIPJACK_KEY_SIZE]; // 10 bytes
+    unsigned char sigkey[SIGNATURE_KEY_SIZE]; // 4 bytes
     int16_t padding; // 2 bytes
 };
 
@@ -97,14 +97,14 @@ bool zabbix_send(const char * key, const char * value);
 bool publish_zabbix(sensordata * data);
 int insert_neutrino_data(sensordata * data);
 float ctof(int16_t c);
-bool decrypt_sensordata(sensordata * data);
+bool decrypt_sensordata(sensordata * data, int addr);
 bool check_sensordata_signature(sensordata * data);
 bool encryption_key_is_empty(char * key);
 bool sensor_is_known(int sensorid);
 bool listener_should_discover();
 unsigned int get_sensor_id(MYSQL * conn, int sensorid, int sensorhubid);
-MYSQL_ROW sql_select_row(char * sql);
-void handle_sensor_message(message * message);
+MYSQL_ROW sql_select_row(const char * sql);
+void handle_sensor_message(message * message, int addr);
 void handle_pairing_message(message * message, int addr);
 
 

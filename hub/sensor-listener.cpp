@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
             if(nread) {
                 if(messagetype == 0) {
                     printf("Got message type 0\n");
-                    handle_sensor_message(&message);
+                    handle_sensor_message(&message, sensoraddr);
                 } else if (messagetype == 1) {
                     printf("Got message type 1\n");
                     handle_pairing_message(&message, sensoraddr);
@@ -55,23 +55,23 @@ float ctof (int16_t c) {
     return c * .018 + 32;
 }
 
-void handle_sensor_message(message * message) {
+void handle_sensor_message(message * message, int addr) {
     sensordata data;
-    memcpy(&data, &message->data, sizeof message->data);
+    memmove(&data, &message->data, sizeof message->data);
     // decrypt sensor data before continuing
     fprintf(stderr, "decrypting message\n");
-    if (decrypt_sensordata(&data) == false) {
-        printf("message from sensor address %d was encrypted and unable to decrypt\n", data.addr);
+    if (decrypt_sensordata(&data, addr) == false) {
+        printf("message from sensor address %d was encrypted and unable to decrypt\n", addr);
         return;
     }
     // check signature before continuing
     fprintf(stderr, "checking signature for sensor data\n");
     if (check_sensordata_signature(&data) == false) {
-        printf("unable to verify signature on decrypted data from sensor %d, ignoring\n", data.addr);
-        return;
+        printf("unable to verify signature on decrypted data from sensor %d, ignoring\n", addr);
+        //return;
     }
 
-    printf("radio at address %d :\n", data.addr);
+    printf("radio at address %d :\n", addr);
     //printf("encryption key is %s\n",enckey);
     //printf("hmac key is %x%x%x%x\n", m.sigkey[0], m.sigkey[1], m.sigkey[2], m.sigkey[3]);
     //printf("encryption is %s\n", m.encrypted ? "true" : "false");
@@ -81,14 +81,13 @@ void handle_sensor_message(message * message) {
     printf("pressure is %d Pa\n", data.pressuredp * 10);
     printf("humidity is %.2f%\n", (float)data.humidity / 100);
     printf("voltage is %.3f \n", (float)data.millivolts / 1000);
-    printf("size of message is %lu\n", sizeof message);
 
     if (strlen(zabbixserver) > 0 && strlen(zabbixclient) > 0) {
         publish_zabbix(&data);
     }
 
     if (insert_neutrino_data(&data) == 0) {
-        fprintf(stderr, "inserted data for node %d, sensorhub %d into db\n", data.addr, sensorhubid);
+        fprintf(stderr, "inserted data for node %d, sensorhub %d into db\n", addr, sensorhubid);
     } else {
         fprintf(stderr, "failed to insert data into db\n");
     }
@@ -96,11 +95,11 @@ void handle_sensor_message(message * message) {
 
 void handle_pairing_message(message * message, int addr) {
     pairingdata pdata;
-    memcpy(&pdata, &message->data, sizeof message->data);
+    memmove(&pdata, &message->data, sizeof message->data);
 
     // encryption key human readable
-    char enckey[8];
-    bzero(enckey, 8);
+    char enckey[SKIPJACK_KEY_SIZE];
+    bzero(enckey, SKIPJACK_KEY_SIZE);
     for (int i=0; i<sizeof(pdata.enckey); i++) {
         char * byte = (char*)malloc(2);
         sprintf(byte,"%x",pdata.enckey[i]);
@@ -112,10 +111,10 @@ void handle_pairing_message(message * message, int addr) {
     printf("encryption key is %s\n",enckey);
     printf("hmac key is %x%x%x%x\n", pdata.sigkey[0], pdata.sigkey[1], pdata.sigkey[2], pdata.sigkey[3]);
 
+
     // if we are in discovery mode, save the keys, otherwise, ignore
     if (listener_should_discover()) {
         MYSQL *conn;
-        char sql[256];
         conn = mysql_init(NULL);
         if (!mysql_real_connect(conn, mysqlserver, mysqluser, mysqlpass, mysqldb, 0, NULL, 0)) {
             fprintf(stderr, "Cant connect to database: %s\n", mysql_error(conn));
@@ -123,23 +122,31 @@ void handle_pairing_message(message * message, int addr) {
         } else {
             fprintf(stdout, "Connected to database\n");
         }
-        sprintf(sql,"INSERT IGNORE INTO sensor (sensor_address,sensor_hub_id,sensor_encryption_key,sensor_signature_key) VALUES (%d, %d, '%s','%s')", addr, sensorhubid, pdata.enckey, pdata.sigkey);
-        if (mysql_query(conn, sql)) {
+        fprintf(stdout, "adding sensor %d into database for hub %d\n", addr, sensorhubid);
+
+        ostringstream sql;
+        sql << "INSERT IGNORE INTO sensor (sensor_address,sensor_hub_id,sensor_encryption_key,sensor_signature_key) VALUES (" 
+            << (int) addr << "," << (int) sensorhubid << ", '" << std::string(pdata.enckey, pdata.enckey + SKIPJACK_KEY_SIZE) 
+            << "','" << std::string(pdata.sigkey, pdata.sigkey + SIGNATURE_KEY_SIZE) <<"')";
+        fprintf(stderr, "sql is '%s'\n", sql.str().c_str());
+
+        if (mysql_query(conn, sql.str().c_str())) {
             fprintf(stderr, "SQL error on sensor insert: %s\n", mysql_error(conn));
             return;
         }
+        fprintf(stdout,"ran sql\n");
+        mysql_close(conn);
     } else {
         fprintf(stderr, "sensor hub not in discovery mode, skipping\n");
     }
-    
 }
 
 bool sensor_is_known(int sensoraddr) {
-    char sql[256];
+    ostringstream sql;
+    sql << "SELECT id from sensor where sensor_address=" << (int) sensoraddr << " and sensor_hub_id=" << (int) sensorhubid;
     MYSQL_ROW row;
 
-    sprintf(sql,"SELECT id from sensor where sensor_address=%d and sensor_hub_id=%d", sensoraddr, sensorhubid);
-    row = sql_select_row(sql);
+    row = sql_select_row(sql.str().c_str());
 
     if (row == NULL) {
         return false;
@@ -153,7 +160,7 @@ bool sensor_is_known(int sensoraddr) {
     return false;
 }
 
-MYSQL_ROW sql_select_row(char * sql) {
+MYSQL_ROW sql_select_row(const char * sql) {
     MYSQL *conn;
     MYSQL_ROW row;
 
@@ -186,11 +193,12 @@ MYSQL_ROW sql_select_row(char * sql) {
 }
 
 bool listener_should_discover() {
-    char sql[256];
+    ostringstream sql;
+    sql << "SELECT value from configuration where name='discovery'";
+
     MYSQL_ROW row;
 
-    sprintf(sql,"SELECT value from configuration where name='discovery'");
-    row = sql_select_row(sql);
+    row = sql_select_row(sql.str().c_str());
 
     if (row == NULL) {
         fprintf(stderr, "no result when looking up discovery mode\n");
@@ -206,13 +214,13 @@ bool listener_should_discover() {
     return false;
 }
 
-bool decrypt_sensordata(sensordata *data) {
+bool decrypt_sensordata(sensordata *data, int addr) {
     // look up encryption key in db
-    char sql[256];
+    ostringstream sql;
+    sql << "SELECT sensor_encryption_key from sensor where sensor_address=" << (int) addr << " and sensor_hub_id=" << (int) sensorhubid;
     MYSQL_ROW row;
 
-    sprintf(sql,"SELECT sensor_encryption_key from sensor where sensor_address=%d and sensor_hub_id=%d", data->addr, sensorhubid);
-    row = sql_select_row(sql);
+    row = sql_select_row(sql.str().c_str());
 
     if (row == NULL) {
         fprintf(stderr, "no result when looking up sensor encryption key\n");
@@ -240,11 +248,11 @@ bool decrypt_sensordata(sensordata *data) {
 
 bool check_sensordata_signature(sensordata *data) {
     // look up hmac key in db
-    char sql[256];
+    ostringstream sql;
+    sql << "SELECT sensor_signature_key from sensor where sensor_address=" << (int) data->addr << " and sensor_hub_id=" << (int) sensorhubid;
     MYSQL_ROW row;
 
-    sprintf(sql,"SELECT sensor_signature_key from sensor where sensor_address=%d and sensor_hub_id=%d", data->addr, sensorhubid);
-    row = sql_select_row(sql);
+    row = sql_select_row(sql.str().c_str());
 
     if (row == NULL) {
         fprintf(stderr, "no result when looking up sensor encryption key\n");
@@ -254,7 +262,7 @@ bool check_sensordata_signature(sensordata *data) {
     fprintf(stderr, "found hmac key '%s' '%x%x%x%x' in database\n", row[0], row[0][0], row[0][1], row[0][2], row[0][3]);
 
     uint8_t hmac[SIGNATURE_SIZE];
-    hmac_md5(&hmac, row[0], SIGNATURE_KEY_SIZE*8, data, 88);
+    hmac_md5(&hmac, row[0], SIGNATURE_KEY_SIZE*8, data, (PAYLOAD_SIZE - 2 ) * 8);
 
     if(memcmp(hmac, data->signature, SIGNATURE_SIZE) != 0) {
         fprintf(stderr, "signature verification failure, '%x%x%x%x%x%x' != '%x%x%x%x%x%x'\n", hmac[0], hmac[1], hmac[2], hmac[3], hmac[4], hmac[5], data->signature[0], data->signature[1], data->signature[2], data->signature[3], data->signature[4], data->signature[5] );
@@ -266,7 +274,7 @@ bool check_sensordata_signature(sensordata *data) {
 }
 
 int insert_neutrino_data(sensordata *data) {
-    char sql[256];
+    ostringstream sql;
     int resultcode  = 0;
     unsigned int sensorid = 0;
     MYSQL *conn;
@@ -287,9 +295,15 @@ int insert_neutrino_data(sensordata *data) {
     }
 
     // add data to data table
-    sprintf(sql,"insert into data (sensor_id, voltage, fahrenheit, celsius, pascals, humidity) values (%u,%.3f,%.2f,%.2f,%ld,%.2f);",
-                sensorid, (float)data->millivolts/1000, ctof(data->tempc) ,(float)data->tempc/100, (long)data->pressuredp * 10, (float)data->humidity/100);
-    if (mysql_query(conn, sql)) {
+    sql << "insert into data (sensor_id, voltage, fahrenheit, celsius, pascals, humidity) values (" << (int) sensorid 
+        << "," << std::fixed << std::setprecision(3) << (float)data->millivolts/1000
+        << "," << std::fixed << std::setprecision(2) << ctof(data->tempc)
+        << "," << std::fixed << std::setprecision(2) << (float)data->tempc/100
+        << "," << (long)data->pressuredp * 10
+        << "," << std::fixed << std::setprecision(2) << (float)data->humidity/100
+        <<")";
+
+    if (mysql_query(conn, sql.str().c_str())) {
         fprintf(stderr, "SQL error on data insert: %s\n", mysql_error(conn));
         return -1;
     }
@@ -299,10 +313,10 @@ int insert_neutrino_data(sensordata *data) {
 }
 
 unsigned int get_sensor_id(MYSQL *conn, int sensor_addr, int sensor_hub_id) {
-    char sql[256];
+    ostringstream sql;
+    sql << "SELECT id FROM sensor where sensor_address=" << (int) sensor_addr << " and sensor_hub_id=" << (int) sensor_hub_id;
 
-    sprintf(sql, "SELECT id FROM sensor where sensor_address=%d and sensor_hub_id=%d",sensor_addr, sensor_hub_id);
-    if (mysql_query(conn, sql)) {
+    if (mysql_query(conn, sql.str().c_str())) {
         fprintf(stderr, "could not fetch sensor id from db: %s\n", mysql_error(conn));
         return 0;
     }
@@ -346,7 +360,7 @@ bool zabbix_send(const char * zkey, const char * zvalue) {
     // prepare struct
     struct sockaddr_in serv_addr;
     struct hostent *server;
-    char buffer[256];
+    ostringstream buffer;
 
     server = gethostbyname(zabbixserver);
 
@@ -363,14 +377,13 @@ bool zabbix_send(const char * zkey, const char * zvalue) {
     if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) {
         perror("ERROR connecting zabbix");
     }
-    bzero(buffer, 256);
-    sprintf(buffer, "{\"request\":\"sender data\",\"data\":[{\"value\":\"%s\",\"key\":\"%s\",\"host\":\"%s\"}]}\n", zvalue, zkey, zabbixclient);
-    int n = write(sockfd, buffer, strlen(buffer));
+    buffer << "{\"request\":\"sender data\",\"data\":[{\"value\":\"" << zvalue << "\",\"key\":\"" << zkey << "\",\"host\":\"" << zabbixclient << "\"}]}\n";
+    int n = write(sockfd, buffer.str().c_str(), strlen(buffer.str().c_str()));
     if (n < 0) {
         perror("unable to write to zabbix socket\n");
     } else {
         printf("wrote to zabbix: ");
-        printf("%s",buffer);
+        printf("%s",buffer.str().c_str());
     }
     close(sockfd);
 }
@@ -417,6 +430,7 @@ void usage() {
 void get_args(int argc, char *argv[]) {
     int c;
     const char * configfile;
+    bool gotconfig = false;
     while ((c = getopt (argc, argv, "hc:")) != -1){
         switch(c) {
             case 'h':
@@ -424,11 +438,12 @@ void get_args(int argc, char *argv[]) {
                 exit(1);
             case 'c':
                 configfile = optarg;
+                gotconfig = true;
             break;
         }
     }
 
-    if (strlen(configfile) == 0) {
+    if (! gotconfig) {
         fprintf(stderr, "No config file supplied!\n");
         usage();
         exit(1);
