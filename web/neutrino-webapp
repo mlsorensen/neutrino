@@ -152,8 +152,8 @@ get "/sensorgroups" => sub {
         # insert group members as well
         foreach my $key (keys %{$data}) {
             $sth = $dbh->prepare("SELECT sensor_address,display_name,sensor_group,sensor.id,sensorgroup_id " .
-                                    "from sensor,sensor_tie where sensor_tie.sensor_id = sensor.id and sensor_tie.sensorgroup_id=$key");
-            $sth->execute();
+                                    "from sensor,sensor_tie where sensor_tie.sensor_id = sensor.id and sensor_tie.sensorgroup_id=?");
+            $sth->execute($key);
             if(!$dbh->errstr()) {
                 $data->{$key}->{members} = $sth->fetchall_hashref('id');
             }
@@ -251,8 +251,8 @@ get "/sensorgroups/:id/sensors" => sub {
 
     my $dbh = _mysql_dbh($self, $config) or return;
     my $sth = $dbh->prepare("SELECT sensor_address,display_name,sensor_group,sensor.id,sensorgroup_id " .
-                            "from sensor,sensor_tie where sensor_tie.sensor_id = sensor.id and sensor_tie.sensorgroup_id=$id");
-    $sth->execute();
+                            "from sensor,sensor_tie where sensor_tie.sensor_id = sensor.id and sensor_tie.sensorgroup_id=?");
+    $sth->execute($id);
     if(!$dbh->errstr()) {
         my $data = $sth->fetchall_hashref('id');
         $self->render(status => 200, json => { result => 1, payload => $data});
@@ -338,8 +338,8 @@ get "/sensors/:id/data" => sub {
     my $dbh = _mysql_dbh($self, $config) or return;
     my $field = $value;
     $field = "voltage,pressure,humidity,temperature" if $field eq "all";
-    my $sth = $dbh->prepare("SELECT UNIX_TIMESTAMP(date) as epoch,date,id,$field from data where sensor_id=$id and date >= DATE_SUB(NOW(),INTERVAL $hours HOUR)");
-    $sth->execute();
+    my $sth = $dbh->prepare("SELECT UNIX_TIMESTAMP(date) as epoch,date,id,$field from data where sensor_id=? and date >= DATE_SUB(NOW(),INTERVAL $hours HOUR)");
+    $sth->execute($id);
     my $data = $sth->fetchall_arrayref({});
     $sth->finish();
     if (!$dbh->errstr()) {
