@@ -54,6 +54,10 @@ sub handle_settings {
 
     # get stats for assigned sensorgroup
     my $stats = get_stats($config);
+    if ($stats eq undef) {
+        print "no stats for controller, doing nothing\n";
+        return;
+    }
 
     # decide whether to heat, cool, or just fan
     if ($config->{type} eq 'temperature') {
@@ -143,6 +147,12 @@ sub gpio_on {
 
 sub get_stats {
     my $config = shift;
+
+    if (! exists $config->{sensorgroupid}) {
+        print "no sensorgroup attached, skipping stats lookup\n";
+        return undef;
+    }
+
     my $dbh = _mysql_dbh($config);
     my $sth = $dbh->prepare("select avg(data.$config->{tempunits}) as temperature, avg(data.humidity) as humidity from data,sensor_tie where sensor_tie.sensorgroup_id=$config->{sensorgroupid} and date > (now() - 120) group by data.sensor_id;");
     $sth->execute();
