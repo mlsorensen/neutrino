@@ -1,18 +1,18 @@
 #!/usr/bin/perl
 use Data::Dumper;
 use DBI;
+use Getopt::Std;
+use File::Slurp qw|read_file|;
 use threads;
 use threads::shared;
 
-my $config = {
-                type      => 'temperature',
-                name      => '1st floor hvac',
-                mysqldb   => 'neutrino',
-                mysqlhost => '127.0.0.1',
-                mysqluser => 'neutrino',
-                mysqlpass => 'electron14',
-                gpio      => { heat => 30, cool => 31, fan => 60, humidify => 51} #beaglebone black pins
-             };
+my $appname = 'controller';
+my $version = '0.1';
+
+my $opts = {};
+getopts('c:', $opts);
+print ("no config file provided\n") && usage() && exit(1) if (! exists $opts->{c});
+my $config = eval(read_file($opts->{c}));
 
 my $gpiolock :shared = 0;
 my $fanlock :shared = 0;
@@ -35,9 +35,6 @@ while (1) {
 
     sleep 5;
 }
-
-
-
 
 ############
 ### subs ###
@@ -322,6 +319,19 @@ sub get_controller_id {
     return 0;
 }
 
+sub usage {
+print <<EOF
+
+$appname v$version
+
+Usage: $appname <options>
+
+options:
+
+    -c configfile
+
+EOF
+}
 
 sub _mysql_dbh {
     my $config = shift;
