@@ -1,6 +1,8 @@
 #!/usr/bin/perl
 use Data::Dumper;
 use DBI;
+use threads;
+use threads::shared;
 
 my $config = {
                 type      => 'temperature',
@@ -11,6 +13,8 @@ my $config = {
                 mysqlpass => 'electron14',
                 gpio      => { heat => 30, cool => 31, fan => 60, humidify => 51} #beaglebone black pins
              };
+
+my $gpiolock :shared = 0;
 
 $SIG{INT}  = \&handle_exit;
 $SIG{TERM} = \&handle_exit;
@@ -48,30 +52,30 @@ sub handle_settings {
     my $config = shift;
 
     if ($config->{settings}->{enabled} eq 'off') {
-        print "controller disabled, doing nothing\n";
+        print ("controller disabled, doing nothing\n");
         return;
     }
 
     # get stats for assigned sensorgroup
     my $stats = get_stats($config);
     if ($stats eq undef) {
-        print "no stats for controller, doing nothing\n";
+        print ("no stats for controller, doing nothing\n");
         return;
     }
 
     # decide whether to heat, cool, or just fan
     if ($config->{type} eq 'temperature') {
         if ($stats->{temperature} eq '') {
-            print "no temperature data found\n";
+            print ("no temperature data found\n");
             return;
         }
         my $maxtemp = $config->{settings}->{setpoint} + $config->{settings}->{tolerance};
         my $mintemp = $config->{settings}->{setpoint} - $config->{settings}->{tolerance};
         if ($stats->{temperature} > $maxtemp) {
-            print "controller sees that sensor data temperature $stats->{temperature} $config->{tempunits} is greater than high setpoint $maxtemp\n";
+            print ("controller sees that sensor data temperature $stats->{temperature} $config->{tempunits} is greater than high setpoint $maxtemp\n");
             do_cooling($config);
         } elsif ($stats->{temperature} < $mintemp) {
-            print "controller sees that sensor data temperature $stats->{temperature} $config->{tempunits} is less than low setpoint $mintemp\n";
+            print ("controller sees that sensor data temperature $stats->{temperature} $config->{tempunits} is less than low setpoint $mintemp\n");
             do_heating($config);
         } elsif ($config->{settings}->{fan_mode} eq 'on') {
             print ("Not heating or cooling, but fanmode is on\n");
@@ -83,7 +87,7 @@ sub handle_settings {
     } elsif ($config->{type} eq 'humidity') {
         
     } else {
-        print "Unknown controller type '$config->{type}', doing nothing\n";
+        print ("Unknown controller type '$config->{type}', doing nothing\n");
     }
 }
 
@@ -117,7 +121,11 @@ sub do_fan {
 sub do_idle {
     my $config = shift;
     foreach my $gpio(keys %{$config->{gpio}}) {
-        gpio_off($config->{gpio}->{$gpio});
+        if ($gpio eq 'fan') {
+            gpio_off_delay($config->{gpio}->{$gpio});
+        } else {
+            gpio_off($config->{gpio}->{$gpio});
+        }
     }
 }
 
@@ -125,6 +133,7 @@ sub gpio_off {
     my $pin = shift;
     my $pindir = "/sys/class/gpio/gpio$pin";
     
+    lock($gpiolock);
     if (! -e $pindir) {
         # pin doesn't exist, can't be on
         return 1;
@@ -133,15 +142,44 @@ sub gpio_off {
     }
 }
 
+sub gpio_off_delay {
+    my $pin = shift;
+    my $pindir = "/sys/class/gpio/gpio$pin";
+
+    if (! -e $pindir) {
+        print ("delayed shutoff requested for pin $pin, but sysfs file doesn't exist. Ignoring request\n");
+        return;
+    }
+
+    my $thr = threads->create(sub {
+        threads->disown();
+        chomp (my $pinstate = `cat $pindir/value`);
+        # do nothing if pin state is already off
+        if ($pinstate == 0) {
+            print "delayed shutoff requested for pin that was already off, ignoring\n";
+        } else {
+            sleep 30;
+            # do nothing if pin state has changed while we were sleeping
+            lock($gpiolock);
+            chomp (my $newpinstate = `cat $pindir/value`);
+            if ( $pinstate == $newpinstate) {
+                `echo 0 > $pindir/value`;
+            }
+        }
+    });
+}
+
 sub gpio_on {
     my $pin = shift;
     my $pindir = "/sys/class/gpio/gpio$pin";
 
+    lock($gpiolock);
     if (! -e $pindir) {
         # pin doesn't exist, can't be on
         `echo $pin > /sys/class/gpio/export`;
         `echo out > $pindir/direction`;
     }
+    
     `echo 1 > $pindir/value`;
 }
 
@@ -149,7 +187,7 @@ sub get_stats {
     my $config = shift;
 
     if (! exists $config->{sensorgroupid}) {
-        print "no sensorgroup attached, skipping stats lookup\n";
+        print ("no sensorgroup attached, skipping stats lookup\n");
         return undef;
     }
 
@@ -203,7 +241,7 @@ sub get_settings {
         get_tempunits($config);
         return 1;
     }
-    print "Error: unable to fetch settings from database\n";
+    print ("Error: unable to fetch settings from database\n");
     return 0;
 }
 
