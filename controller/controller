@@ -197,8 +197,15 @@ sub get_stats {
     }
 
     my $dbh = _mysql_dbh($config);
-    my $sth = $dbh->prepare("select avg(data.$config->{tempunits}) as temperature, avg(data.humidity) as humidity from data,sensor_tie where sensor_tie.sensorgroup_id=$config->{sensorgroupid} and date > (now() - 120) group by data.sensor_id;");
-    $sth->execute();
+    my $tempcol = '';
+    $tempcol = "fahrenheit" if $config->{tempunits} eq "fahrenheit";
+    $tempcol = "celsius" if $config->{tempunits} eq "celsius";
+    if ($tempcol eq '') {
+        print "unable to get temperature preference from config, not fetching stats\n";
+        return undef;
+    }
+    my $sth = $dbh->prepare("select avg($tempcol) as temperature, avg(data.humidity) as humidity from data,sensor_tie where sensor_tie.sensorgroup_id=? and date > (now() - 120) group by data.sensor_id;");
+    $sth->execute($config->{sensorgroupid});
     my $row = $sth->fetchrow_hashref();
     $sth->finish();
     $dbh->disconnect();
@@ -218,8 +225,8 @@ sub get_sensors {
         return 0;
     }
 
-    my $sth = $dbh->prepare("select sensor_id from sensor_tie where sensorgroup_id='$config->{sensorgroupid}'");
-    $sth->execute();
+    my $sth = $dbh->prepare("select sensor_id from sensor_tie where sensorgroup_id=?");
+    $sth->execute($config->{sensorgroupid});
     $config->{sensors} = $sth->fetchall_arrayref();
     $sth->finish();
     $dbh->disconnect();
@@ -234,8 +241,8 @@ sub get_sensors {
 sub get_settings {
     my $config = shift;
     my $dbh = _mysql_dbh($config);
-    my $sth = $dbh->prepare("select setpoint,tolerance,enabled,fan_mode from controller where id='$config->{id}'");
-    $sth->execute();
+    my $sth = $dbh->prepare("select setpoint,tolerance,enabled,fan_mode from controller where id=?");
+    $sth->execute($config->{id});
     my $row = $sth->fetchrow_hashref();
     $sth->finish();
     $dbh->disconnect();
@@ -253,8 +260,8 @@ sub get_settings {
 sub get_sensorgroup {
     my $config = shift;
     my $dbh = _mysql_dbh($config);
-    my $sth = $dbh->prepare("select id from sensorgroup where controller_id='$config->{id}'");
-    $sth->execute();
+    my $sth = $dbh->prepare("select id from sensorgroup where controller_id=?");
+    $sth->execute($config->{id});
     my $row = $sth->fetchrow_hashref();
     $sth->finish();
     $dbh->disconnect();
@@ -303,8 +310,8 @@ sub verify_controller {
 sub get_controller_id {
     my $config = shift;
     my $dbh = _mysql_dbh($config) or return;
-    my $sth = $dbh->prepare("select id from controller where display_name='$config->{name}'");
-    $sth->execute();
+    my $sth = $dbh->prepare("select id from controller where display_name=?");
+    $sth->execute($config->{name});
     my $row = $sth->fetchrow_hashref();
     $sth->finish();
     $dbh->disconnect();
@@ -320,6 +327,6 @@ sub _mysql_dbh {
     my $config = shift;
     my $dbh    = DBI->connect("DBI:mysql:database=$config->{mysqldb}:host=$config->{mysqlserver}:port=3306",
                            $config->{mysqluser},$config->{mysqlpass})
-                      or $self->render(status=>500,text=>'Failed database connection') and return 0;
+                      or print "Failed database connection\n" and return 0;
     return $dbh;
 }
