@@ -15,6 +15,7 @@ my $config = {
              };
 
 my $gpiolock :shared = 0;
+my $fanlock :shared = 0;
 
 $SIG{INT}  = \&handle_exit;
 $SIG{TERM} = \&handle_exit;
@@ -45,6 +46,9 @@ sub handle_exit {
     my $signal = shift;
     do_idle($config);
     print ("\nexiting on signal $signal\n");
+    print ("might need to wait for fan to clear excess heat/cold/humidity\n");
+    lock($fanlock);
+    print ("goodbye\n");
     exit(0);
 }
 
@@ -152,6 +156,7 @@ sub gpio_off_delay {
     }
 
     my $thr = threads->create(sub {
+        lock($fanlock);
         threads->disown();
         chomp (my $pinstate = `cat $pindir/value`);
         # do nothing if pin state is already off
