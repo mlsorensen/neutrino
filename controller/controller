@@ -1,0 +1,272 @@
+#!/usr/bin/perl
+use Data::Dumper;
+use DBI;
+
+my $config = {
+                type      => 'temperature',
+                name      => '1st floor hvac',
+                mysqldb   => 'neutrino',
+                mysqlhost => '127.0.0.1',
+                mysqluser => 'neutrino',
+                mysqlpass => 'electron14',
+                gpio      => { heat => 30, cool => 31, fan => 60, humidify => 51} #beaglebone black pins
+             };
+
+$SIG{INT}  = \&handle_exit;
+$SIG{TERM} = \&handle_exit;
+
+if (! verify_controller($config)) {
+    die("unable to find or register controller with database, exiting\n");
+}
+
+print ("verified controller, starting services\n");
+
+while (1) {
+    if (get_settings($config)) {
+        handle_settings($config);
+    } else {
+        print ("skipping due to setpoint fetch failure\n");
+    }
+
+    sleep 5;
+}
+
+
+
+
+############
+### subs ###
+############
+sub handle_exit {
+    my $signal = shift;
+    do_idle($config);
+    print ("\nexiting on signal $signal\n");
+    exit(0);
+}
+
+sub handle_settings {
+    my $config = shift;
+
+    if ($config->{settings}->{enabled} eq 'off') {
+        print "controller disabled, doing nothing\n";
+        return;
+    }
+
+    # get stats for assigned sensorgroup
+    my $stats = get_stats($config);
+
+    # decide whether to heat, cool, or just fan
+    if ($config->{type} eq 'temperature') {
+        if ($stats->{temperature} eq '') {
+            print "no temperature data found\n";
+            return;
+        }
+        my $maxtemp = $config->{settings}->{setpoint} + $config->{settings}->{tolerance};
+        my $mintemp = $config->{settings}->{setpoint} - $config->{settings}->{tolerance};
+        if ($stats->{temperature} > $maxtemp) {
+            print "controller sees that sensor data temperature $stats->{temperature} $config->{tempunits} is greater than high setpoint $maxtemp\n";
+            do_cooling($config);
+        } elsif ($stats->{temperature} < $mintemp) {
+            print "controller sees that sensor data temperature $stats->{temperature} $config->{tempunits} is less than low setpoint $mintemp\n";
+            do_heating($config);
+        } elsif ($config->{settings}->{fan_mode} eq 'on') {
+            print ("Not heating or cooling, but fanmode is on\n");
+            do_fan($config);
+        } else {
+            print ("All is well for temperature controller\n");
+            do_idle($config);
+        }
+    } elsif ($config->{type} eq 'humidity') {
+        
+    } else {
+        print "Unknown controller type '$config->{type}', doing nothing\n";
+    }
+}
+
+sub do_cooling {
+    my $config = shift;
+    foreach my $gpio(keys %{$config->{gpio}}) {
+        gpio_off($config->{gpio}->{$gpio}) unless $gpio eq 'cool' or $gpio eq 'fan';
+    }
+    gpio_on($config->{gpio}->{fan});
+    gpio_on($config->{gpio}->{cool});
+    
+}
+
+sub do_heating {
+my $config = shift;
+    foreach my $gpio(keys %{$config->{gpio}}) {
+        gpio_off($config->{gpio}->{$gpio}) unless $gpio eq 'heat' or $gpio eq 'fan';
+    }
+    gpio_on($config->{gpio}->{fan});
+    gpio_on($config->{gpio}->{heat});
+}
+
+sub do_fan {
+    my $config = shift;
+    foreach my $gpio(keys %{$config->{gpio}}) {
+        gpio_off($config->{gpio}->{$gpio}) unless $gpio eq 'fan';
+    }
+    gpio_on($config->{gpio}->{fan});
+}
+
+sub do_idle {
+    my $config = shift;
+    foreach my $gpio(keys %{$config->{gpio}}) {
+        gpio_off($config->{gpio}->{$gpio});
+    }
+}
+
+sub gpio_off {
+    my $pin = shift;
+    my $pindir = "/sys/class/gpio/gpio$pin";
+    
+    if (! -e $pindir) {
+        # pin doesn't exist, can't be on
+        return 1;
+    } else {
+        `echo 0 > $pindir/value`;
+    }
+}
+
+sub gpio_on {
+    my $pin = shift;
+    my $pindir = "/sys/class/gpio/gpio$pin";
+
+    if (! -e $pindir) {
+        # pin doesn't exist, can't be on
+        `echo $pin > /sys/class/gpio/export`;
+        `echo out > $pindir/direction`;
+    }
+    `echo 1 > $pindir/value`;
+}
+
+sub get_stats {
+    my $config = shift;
+    my $dbh = _mysql_dbh($config);
+    my $sth = $dbh->prepare("select avg(data.$config->{tempunits}) as temperature, avg(data.humidity) as humidity from data,sensor_tie where sensor_tie.sensorgroup_id=$config->{sensorgroupid} and date > (now() - 120) group by data.sensor_id;");
+    $sth->execute();
+    my $row = $sth->fetchrow_hashref();
+    $sth->finish();
+    $dbh->disconnect();
+    if ($dbh->errstr()) {
+        print ("error fetchng sensor data: " . $dbh->errstr() . "\n");
+        return undef;
+    }
+    return $row;
+}
+
+sub get_sensors {
+    my $config = shift;
+    my $dbh = _mysql_dbh($config);
+
+    if (! exists $config->{sensorgroupid}) {
+        print ("controller has no sensor group attached, no sensors to fetch\n");
+        return 0;
+    }
+
+    my $sth = $dbh->prepare("select sensor_id from sensor_tie where sensorgroup_id='$config->{sensorgroupid}'");
+    $sth->execute();
+    $config->{sensors} = $sth->fetchall_arrayref();
+    $sth->finish();
+    $dbh->disconnect();
+    if ($dbh->errstr()) {
+        print ("Error fetching sensors from sensor tie table: " . $dbh->errstr() . "\n");
+        return 0;
+    } else {
+        return 1;
+    }
+}
+
+sub get_settings {
+    my $config = shift;
+    my $dbh = _mysql_dbh($config);
+    my $sth = $dbh->prepare("select setpoint,tolerance,enabled,fan_mode from controller where id='$config->{id}'");
+    $sth->execute();
+    my $row = $sth->fetchrow_hashref();
+    $sth->finish();
+    $dbh->disconnect();
+    if (exists $row->{setpoint}) {
+        $config->{settings} = $row;
+        get_sensorgroup($config);
+        get_sensors($config);
+        get_tempunits($config);
+        return 1;
+    }
+    print "Error: unable to fetch settings from database\n";
+    return 0;
+}
+
+sub get_sensorgroup {
+    my $config = shift;
+    my $dbh = _mysql_dbh($config);
+    my $sth = $dbh->prepare("select id from sensorgroup where controller_id='$config->{id}'");
+    $sth->execute();
+    my $row = $sth->fetchrow_hashref();
+    $sth->finish();
+    $dbh->disconnect();
+    if (exists $row->{id}) {
+        $config->{sensorgroupid} = $row->{id};
+    } else {
+        delete $config->{sensorgroupid} if exists $config->{sensorgroupid};
+    }
+}
+
+sub get_tempunits {
+    my $config = shift;
+    my $dbh = _mysql_dbh($config);
+    my $sth = $dbh->prepare("select value from configuration where name='tempunits'");
+    $sth->execute();
+    my $row = $sth->fetchrow_hashref();
+    $sth->finish();
+    $dbh->disconnect();
+    if (exists $row->{value}) {
+        $config->{tempunits} = lc($row->{value});
+    } else {
+        die("Unable to find a temperature unit preference in the database, exiting\n");
+    }
+}
+
+# find controller in db, or add it if missing
+sub verify_controller {
+    my $config = shift;
+
+    if (get_controller_id($config)) {
+        return 1;
+    }
+
+    my $dbh = _mysql_dbh($config) or return;
+    $dbh->do("insert into controller (display_name,type) values (?, ?)", undef, $config->{name}, $config->{type});
+    if ($dbh->errstr()) {
+        die ("Error inserting controller: " . $dbh->errstr() . "\n");
+    } else {
+        if (get_controller_id($config)) {
+            return 1;
+        }
+    }
+    die ("Error verifying controller, unable to successfully insert and fetch controller from database\n");
+}
+
+sub get_controller_id {
+    my $config = shift;
+    my $dbh = _mysql_dbh($config) or return;
+    my $sth = $dbh->prepare("select id from controller where display_name='$config->{name}'");
+    $sth->execute();
+    my $row = $sth->fetchrow_hashref();
+    $sth->finish();
+    $dbh->disconnect();
+    if (exists $row->{id}) {
+        $config->{id} = $row->{id};
+        return 1;
+    }
+    return 0;
+}
+
+
+sub _mysql_dbh {
+    my $config = shift;
+    my $dbh    = DBI->connect("DBI:mysql:database=$config->{mysqldb}:host=$config->{mysqlserver}:port=3306",
+                           $config->{mysqluser},$config->{mysqlpass})
+                      or $self->render(status=>500,text=>'Failed database connection') and return 0;
+    return $dbh;
+}
