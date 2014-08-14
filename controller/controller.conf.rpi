@@ -1,5 +1,6 @@
 {
     type      => 'temperature',
+    capabilities => [ 'heat', 'cool', 'humidify' ],
     name      => '1st floor hvac',
     mysqldb   => 'neutrino',
     mysqlhost => '127.0.0.1',

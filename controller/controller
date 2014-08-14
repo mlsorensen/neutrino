@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 use Data::Dumper;
 use DBI;
 use Getopt::Std;
@@ -122,12 +122,22 @@ sub do_fan {
 sub do_idle {
     my $config = shift;
     foreach my $gpio(keys %{$config->{gpio}}) {
+        next unless gpio_status($config->{gpio}->{$gpio});
         if ($gpio eq 'fan') {
             gpio_off_delay($config->{gpio}->{$gpio});
         } else {
             gpio_off($config->{gpio}->{$gpio});
         }
     }
+}
+
+sub gpio_status {
+    my $pin = shift;
+    my $pindir = "/sys/class/gpio/gpio$pin";
+
+    lock($gpiolock);
+    chomp(my $pinval = `cat $pindir/value`);
+    return pinval;
 }
 
 sub gpio_off {
@@ -154,11 +164,11 @@ sub gpio_off_delay {
 
     my $thr = threads->create(sub {
         lock($fanlock);
-        threads->disown();
+        threads->detach();
         chomp (my $pinstate = `cat $pindir/value`);
         # do nothing if pin state is already off
         if ($pinstate == 0) {
-            print "delayed shutoff requested for pin that was already off, ignoring\n";
+            #print "delayed shutoff requested for pin that was already off, ignoring\n";
         } else {
             sleep 30;
             # do nothing if pin state has changed while we were sleeping
