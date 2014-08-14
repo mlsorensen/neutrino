@@ -6,16 +6,16 @@ use File::Slurp qw|read_file|;
 use threads;
 use threads::shared;
 
-my $appname = 'controller';
-my $version = '0.1';
+my $appname          = 'controller';
+my $version          = '0.1';
+my $gpiolock :shared = 0;
+my $fanlock  :shared = 0;
+my $state            = 'idle';
+my $opts             = {};
 
-my $opts = {};
 getopts('c:', $opts);
 print ("no config file provided\n") && usage() && exit(1) if (! exists $opts->{c});
 my $config = eval(read_file($opts->{c}));
-
-my $gpiolock :shared = 0;
-my $fanlock :shared = 0;
 
 $SIG{INT}  = \&handle_exit;
 $SIG{TERM} = \&handle_exit;
@@ -25,6 +25,7 @@ if (! verify_controller($config)) {
 }
 
 print ("verified controller, starting services\n");
+do_idle();
 
 while (1) {
     if (get_settings($config)) {
@@ -65,31 +66,56 @@ sub handle_settings {
     }
 
     # decide whether to heat, cool, or just fan
-    if ($config->{type} eq 'temperature') {
-        if ($stats->{temperature} eq '') {
-            print ("no temperature data found\n");
-            return;
-        }
-        my $maxtemp = $config->{settings}->{setpoint} + $config->{settings}->{tolerance};
-        my $mintemp = $config->{settings}->{setpoint} - $config->{settings}->{tolerance};
-        if ($stats->{temperature} > $maxtemp) {
-            print ("controller sees that sensor data temperature $stats->{temperature} $config->{tempunits} is greater than high setpoint $maxtemp\n");
-            do_cooling($config);
-        } elsif ($stats->{temperature} < $mintemp) {
-            print ("controller sees that sensor data temperature $stats->{temperature} $config->{tempunits} is less than low setpoint $mintemp\n");
-            do_heating($config);
-        } elsif ($config->{settings}->{fan_mode} eq 'on') {
-            print ("Not heating or cooling, but fanmode is on\n");
-            do_fan($config);
-        } else {
-            print ("All is well for temperature controller\n");
-            do_idle($config);
-        }
-    } elsif ($config->{type} eq 'humidity') {
-        
+    $state = state_classifier($stats, $config);
+    
+    if ($state eq "heat") {
+        do_heating($config);
+    } elsif ($state eq "heat+humidify") {
+        do_heating_and_humidifying($config);
+    } elsif ($state eq "humidify") {
+        do_humidifying($config);
+    } elsif ($state eq "cool") {
+        do_cooling($config);
     } else {
-        print ("Unknown controller type '$config->{type}', doing nothing\n");
+        do_idle($config);
     }
+}
+
+sub state_classifier {
+    my $stats = shift;
+    my $config = shift;
+
+    my $newstate = "idle";
+    my $maxtemp = $config->{settings}->{setpoint} + $config->{settings}->{tolerance};
+    my $mintemp = $config->{settings}->{setpoint} - $config->{settings}->{tolerance};
+
+    # if we are already heating, cooling, humidifying we adjust the cutoff so we don't shut off prematurely
+    if ($state eq "heat" or $state eq "heat+humidify") {
+        $mintemp += $config->{settings}->{tolerance}/2;
+    } elsif ($state eq "cool") {
+        $maxtemp -= $config->{settings}->{tolerance}/2;
+    } elsif ($state eq "humidify") {
+        
+    }
+
+    # heat
+    if (grep("heat", @{$config->{capabilities}}) && $stats->{temperature} ne "" && $stats->{temperature} < $mintemp) {
+        $newstate = "heat";
+    }
+
+    # humidify, we can add this to heat. TODO: setpoints for humidification
+    if (grep("humidify", @{$config->{capabilities}})) {
+        #$newstate eq "heat" ? $newstate = "heat+humidify" : $newstate = "humidify";
+    }
+
+    # cool, we need to block out humidify unless we want rain in the ducts. Simply overwrite humidify if we need to cool.
+    if (grep("cool", @{$config->{capabilities}}) && $stats->{temperature} ne "" && $stats->{temperature} > $maxtemp) {
+        $newstate = "cool";
+    }
+
+    print ("state is classified as '$newstate'\n");
+
+    return $newstate;
 }
 
 sub do_cooling {
@@ -111,6 +137,23 @@ my $config = shift;
     gpio_on($config->{gpio}->{heat});
 }
 
+sub do_humidifying {
+   foreach my $gpio(keys %{$config->{gpio}}) {
+        gpio_off($config->{gpio}->{$gpio}) unless $gpio eq 'humidify' or $gpio eq 'fan';
+    }
+    gpio_on($config->{gpio}->{fan});
+    gpio_on($config->{gpio}->{humidify});
+}
+
+sub do_heating_and_humidifying {
+    foreach my $gpio(keys %{$config->{gpio}}) {
+        gpio_off($config->{gpio}->{$gpio}) unless $gpio eq 'heat' or $gpio eq 'fan' or $gpio eq 'humidify';
+    }
+    gpio_on($config->{gpio}->{fan});
+    gpio_on($config->{gpio}->{heat});
+    gpio_on($config->{gpio}->{humidify});
+}
+
 sub do_fan {
     my $config = shift;
     foreach my $gpio(keys %{$config->{gpio}}) {
@@ -129,6 +172,7 @@ sub do_idle {
             gpio_off($config->{gpio}->{$gpio});
         }
     }
+    $state = "idle";
 }
 
 sub gpio_status {
