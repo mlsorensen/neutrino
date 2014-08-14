@@ -34,29 +34,28 @@ CREATE TABLE neutrino.configuration (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
-CREATE TABLE neutrino.controller (
-  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `display_name` varchar(255) NOT NULL,
-  `type` enum('temperature','humidity') NOT NULL,
-  `setpoint` float DEFAULT NULL,
-  `tolerance` float NOT NULL DEFAULT 3,
-  `enabled` enum('on','off') NOT NULL DEFAULT 'off',
-  `status` enum('heating','cooling','fan','idle') NOT NULL DEFAULT 'idle',
-  `fan_mode` enum('on','auto') NOT NULL DEFAULT 'auto',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
 CREATE TABLE neutrino.controller_capabilities (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `capability` enum('heat','cool','humidify'),
   `controller_id` int(10) unsigned NOT NULL,
+  `capability` enum('heat','cool','humidify'),
+  `setpoint` float DEFAULT NULL,
+  UNIQUE `unique_index`(`controller_id`,`capability`),
   PRIMARY KEY (`id`),
   FOREIGN KEY (`controller_id`) REFERENCES `controller` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
+CREATE TABLE neutrino.controller (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `display_name` varchar(255) UNIQUE NOT NULL,
+  `enabled` enum('on','off') NOT NULL DEFAULT 'off',
+  `status` enum('heat','cool','humidify','heat+humidify','fan','idle') NOT NULL DEFAULT 'idle',
+  `fan_mode` enum('on','auto') NOT NULL DEFAULT 'auto',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
 CREATE TABLE neutrino.sensorgroup (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `display_name` varchar(255) NOT NULL,
+  `display_name` varchar(255) UNIQUE NOT NULL,
   `controller_id` int(10) unsigned UNIQUE DEFAULT NULL,
   PRIMARY KEY (`id`),
   CONSTRAINT `sensorgroup_ibfk_1` FOREIGN KEY (`controller_id`) REFERENCES `controller` (`id`)

@@ -29,6 +29,7 @@ do_idle();
 
 while (1) {
     if (get_settings($config)) {
+        print Dumper $config;
         handle_settings($config);
     } else {
         print ("skipping due to setpoint fetch failure\n");
@@ -82,35 +83,39 @@ sub handle_settings {
 }
 
 sub state_classifier {
-    my $stats = shift;
+    my $stats  = shift;
     my $config = shift;
+    my $caps   = $config->{settings}->{capabilities};
 
     my $newstate = "idle";
-    my $maxtemp = $config->{settings}->{setpoint} + $config->{settings}->{tolerance};
-    my $mintemp = $config->{settings}->{setpoint} - $config->{settings}->{tolerance};
 
-    # if we are already heating, cooling, humidifying we adjust the cutoff so we don't shut off prematurely
-    if ($state eq "heat" or $state eq "heat+humidify") {
-        $mintemp += $config->{settings}->{tolerance}/2;
-    } elsif ($state eq "cool") {
-        $maxtemp -= $config->{settings}->{tolerance}/2;
-    } elsif ($state eq "humidify") {
-        
-    }
-
-    # heat
-    if (grep("heat", @{$config->{capabilities}}) && $stats->{temperature} ne "" && $stats->{temperature} < $mintemp) {
-        $newstate = "heat";
+    # heat. If we were already heating, use setpoint + 1 as the cutoff.
+    # the idea is that given setpoint 72 deg we don't start heating at 71.99 deg and stop at 72.01, we push up to 73.
+    # we might want to consider PID logic, we'd be one of the first thermostats to do so.
+    if (exists $caps->{heat} && $stats->{temperature} ne "" && $caps->{heat}->{setpoint} ne undef) {
+        # keep heating to setpoint + 1 if we were already heating
+        if ($state eq "heat" && $stats->{temperature} <= $caps->{heat}->{setpoint} + 1) {
+            $newstate = "heat";
+        # start heating at setpoint if we weren't previously heating
+        } elsif ($stats->{temperature} <= $caps->{heat}->{setpoint}) {
+            $newstate = "heat";
+        }
     }
 
     # humidify, we can add this to heat. TODO: setpoints for humidification
-    if (grep("humidify", @{$config->{capabilities}})) {
+    if (exists $config->{settings}->{capabilities}->{humidify}) {
         #$newstate eq "heat" ? $newstate = "heat+humidify" : $newstate = "humidify";
     }
 
-    # cool, we need to block out humidify unless we want rain in the ducts. Simply overwrite humidify if we need to cool.
-    if (grep("cool", @{$config->{capabilities}}) && $stats->{temperature} ne "" && $stats->{temperature} > $maxtemp) {
-        $newstate = "cool";
+    # cool, we need to block out humidify unless we want rain in the ducts. Simply overwrite humidify newstate if we need to cool.
+    if (exists $caps->{cool} && $stats->{temperature} ne "" && $caps->{cool}->{setpoint} ne undef) {
+        # keep cooling to setpoint -1 if we were already cooling
+        if ($state eq "cool" && $stats->{temperature} >= $caps->{cool}->{setpoint} - 1) {
+            $newstate = "cool";
+        # start heating at setpoint if we weren't previously heating
+        } elsif ($stats->{temperature} >= $caps->{cool}->{setpoint}) {
+            $newstate = "cool";
+        }
     }
 
     print ("state is classified as '$newstate'\n");
@@ -292,12 +297,16 @@ sub get_sensors {
 sub get_settings {
     my $config = shift;
     my $dbh = _mysql_dbh($config);
-    my $sth = $dbh->prepare("select setpoint,tolerance,enabled,fan_mode from controller where id=?");
+    my $sth = $dbh->prepare("select enabled,fan_mode from controller where id=?");
     $sth->execute($config->{id});
     my $row = $sth->fetchrow_hashref();
     $sth->finish();
+    $sth = $dbh->prepare("select capability,setpoint from controller_capabilities where controller_id=?");
+    $sth->execute($config->{id});
+    $row->{capabilities} = $sth->fetchall_hashref('capability');
+    $sth->finish();
     $dbh->disconnect();
-    if (exists $row->{setpoint}) {
+    if (! $dbh->errstr()) {
         $config->{settings} = $row;
         get_sensorgroup($config);
         get_sensors($config);

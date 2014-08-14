@@ -75,6 +75,12 @@ get "/controllers" => sub {
     $sth->execute();
     my $data = $sth->fetchall_hashref('id');
     $sth->finish();
+    foreach my $id (keys %{$data}) {
+        my $sth  = $dbh->prepare("SELECT capability,setpoint from controller_capabilities where controller_id=?");
+        $sth->execute($id);
+        $data->{$id}->{capabilities} = $sth->fetchall_hashref('capability');
+        $sth->finish();
+    }
     if (!$dbh->errstr()) {
         $self->render(status => 200, json => { result => 1, payload => $data});
     } else {
