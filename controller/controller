@@ -303,13 +303,17 @@ sub verify_controller {
     }
 
     my $dbh = _mysql_dbh($config) or return;
-    $dbh->do("insert into controller (display_name,type) values (?, ?)", undef, $config->{name}, $config->{type});
+    $dbh->do("insert into controller (display_name) values (?)", undef, $config->{name});
     if ($dbh->errstr()) {
         die ("Error inserting controller: " . $dbh->errstr() . "\n");
     } else {
-        if (get_controller_id($config)) {
+        my $controllerid = get_controller_id($config);
+        if ($controllerid) {
+            foreach my $capability( @{$config->{capabilities}}) {
+                $dbh->do("insert into controller_capabilities (controller_id, capability) values (?, ?)", undef, $controllerid, $capability);
+            }
             return 1;
-        }
+        } 
     }
     die ("Error verifying controller, unable to successfully insert and fetch controller from database\n");
 }

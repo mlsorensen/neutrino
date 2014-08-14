@@ -43,7 +43,15 @@ CREATE TABLE neutrino.controller (
   `enabled` enum('on','off') NOT NULL DEFAULT 'off',
   `status` enum('heating','cooling','fan','idle') NOT NULL DEFAULT 'idle',
   `fan_mode` enum('on','auto') NOT NULL DEFAULT 'auto',
-   PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+CREATE TABLE neutrino.controller_capabilities (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `capability` enum('heat','cool','humidify'),
+  `controller_id` int(10) unsigned NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`controller_id`) REFERENCES `controller` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE neutrino.sensorgroup (
