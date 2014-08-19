@@ -1,4 +1,4 @@
-///////////////////////////////
+////`///////////////////////////
 // graph api for sensor data //
 ///////////////////////////////
 
@@ -22,6 +22,7 @@ for (i=1; i <= 5; i++) {
     colors.green.push(rgbToHex(200-o1, o3, o1));
     colors.green.push(rgbToHex(o1, o3, 200-o1));
 }
+*/
 
 function componentToHex(c) {
     var hex = c.toString(16);
@@ -30,21 +31,38 @@ function componentToHex(c) {
 
 function rgbToHex(r, g, b) {
     return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
-}*/
+}
+
+function hexToRgb(hex) {
+    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : null;
+}
 
 // this code is for testing
 $(document).ready(function(){
-    $('#button1').click(function() {
+    $('#test-button1').click(function() {
         // graph( sensorids, axes, time, graphx, graphy, divid);
         var sensorids = [1];
         var axes = ['fahrenheit','humidity'];
-        graph(sensorids, axes, 1, 400, 150, $('#graphdiv'));
+        sensorGraph(sensorids, axes, 1, 400, 150, $('#graphdiv'));
     });
 });
 
-//
+/*
+sensorids = array of sensor ids
+axes      = array of labels for axes, needs to be one of valid data types Fahrenheit, Celsius, Humidity, Voltage
+colors    = array of colors for axes, if each axis has multiple lines we should morph the selected color for that axis
+time      = integer number of hours to graph
+graphx    = graph should be x pixels wide, null inherits width from targetdiv
+graphy    = graph should be y pixels tall, null inherits height from targetdiv
+targetdiv = location to render graph
+*/
 
-function graph( sensorids, axes, time, graphx, graphy, targetdiv) {
+function sensorGraph( sensorids, axes, colors, time, graphx, graphy, targetdiv) {
     var sensordata = [];
     var dataset = [];
 
@@ -53,13 +71,22 @@ function graph( sensorids, axes, time, graphx, graphy, targetdiv) {
         targetdiv.html("only one or two axes, please");
         return;
     }
+
+    if (graphx == null) {
+        graphx = targetdiv.width();
+    }
+
+    if (graphy == null) {
+        graphy = targetdiv.height();
+    }
     
     for( i = 0; i < sensorids.length; i++) {
         var sensorid = sensorids[i];
         for ( j = 0; j < axes.length; j++) {
             console.log("fetching data " + axes[j]+ " for sensor" + sensorid);
             dataset.push({data: getSensorData(sensorid, time, axes[j]), 
-                          label: axes[j], 
+                          label: axes[j],
+                          color: chooseColor(colors[j], sensorid),
                           lines: {show:true},
                           yaxis: j + 1
                          });
@@ -107,3 +134,11 @@ function getSensorData(sensor, hours, datatype) {
     }
     return graphdata;
 }
+
+function chooseColor(startcolor, id) {
+    var rgb = hexToRgb(startcolor);
+    var multiplier = id * 20;
+    return rgbToHex(rgb.r + multiplier, rgb.g + multiplier, rgb.b + multiplier);
+}
+
+

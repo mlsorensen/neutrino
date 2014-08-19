@@ -166,7 +166,7 @@ function getSensorData(sensor, hours, datatype) {
     }
     return graphdata;
 }
-
+/*
 function renderSensorGraph(sensor, value, hours, targetdiv) {
     var temperaturedata = getSensorData(sensor, hours, config.tempunits.value);
     var humiditydata    = getSensorData(sensor, hours, "humidity");
@@ -188,7 +188,22 @@ function renderSensorGraph(sensor, value, hours, targetdiv) {
         targetdiv.css("background", "linear-gradient(to top, #ebebeb , white)");
     }
 }
+*/
+function sensorIdsFromGroup(sensorgroupid) {
+    if (Object.keys(sensorgroups[sensorgroupid].members).length == 0) {
+        console.log("no sensors attached to group");
+        return;
+    }
 
+    var ids = [];
+    console.log(sensorgroups[sensorgroupid]);
+
+    Object.keys(sensorgroups[sensorgroupid].members).forEach(function(member) {
+        ids.push(sensorgroups[sensorgroupid].members[member].id);
+    });
+    return ids;
+}
+/*
 function renderSensorGroupGraph(sensorgroupid, targetdiv) {
     var dataset = [];
     var humlabel = 'Humidity %';
@@ -202,6 +217,8 @@ function renderSensorGroupGraph(sensorgroupid, targetdiv) {
         targetdiv.addClass('hidden');
         return;
     }
+
+    console.log(Object.keys(sensorgroups[sensorgroupid].members));
 
     if (controllerid == null || (controllerid != null && getLimitsAxis(controllerid) == 1 )) {
         for (var sensorid in sensorgroups[sensorgroupid].members) {
@@ -257,7 +274,7 @@ function getLimitsAxis(controllerid) {
     } else {
         return 2;
     }
-}
+}*/
 
 function populateSensors() {
     for (var key in sensors) {
@@ -272,7 +289,8 @@ function populateSensors() {
     $(".nav-stacked > .sensor > a").on("click", function(event) {
         $(".nav-stacked > .sensor").removeClass('active');
         $(this).parent().addClass('active');
-        renderSensorGraph($(this)[0].id, "temperature", config.graphtime.value, $("#sensor-graph"));
+        sensorGraph([$(this)[0].id], ["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensor-graph-upper"));
+        sensorGraph([$(this)[0].id], ["Humidity"], ["AA0033"],config.graphtime.value, null, null, $("#sensor-graph-lower"));
         $("#sensor-name-input").val($(this).html());
         $("#sensor-panel-title").html(event.target.id);
         renderVoltage($(this));
@@ -392,13 +410,6 @@ function populateSensorGroups(activesensorgroupid) {
             });
         } else {
             $("#sensorgroup-controllerbar").addClass("hidden");
-            /*$("#controllerbar-name").html("No controller attached");
-            $("#controllerbar-status").html("");
-            $("#controllerbar-setpointtable").addClass("hidden");
-            $("#controllerbar-tolerancetable").addClass("hidden");
-            $("#controllerbar-fanmodetable").addClass("hidden");
-            $("#controllerbar-enabledropdown").addClass("hidden");
-    */
         }
 
         // populate controller select dropdown
@@ -453,7 +464,7 @@ function populateSensorGroups(activesensorgroupid) {
         });
 
         // render group graph
-        renderSensorGroupGraph(sensorgroupid, $("#sensorgroup-graph"));
+        sensorGraph(sensorIdsFromGroup(sensorgroupid), ["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensorgroup-graph"));
     });
 
     // select a group to show by default
@@ -473,7 +484,7 @@ function controllerSaveSetting(controllerid, targetdiv, settingvalue, settingnam
                 targetdiv.html(settingvalue + " ");
                 targetdiv.notify("success","info", {autoHideDelay:1000});
                 controllers[controllerid][settingname] = settingvalue;
-                renderSensorGroupGraph($(".sensorgroup.active > a")[0].id, $("#sensorgroup-graph"));
+                sensorGraph(sensorIdsFromGroup($(".sensorgroup.active > a")[0].id),["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensorgroup-graph"));
                 return 1;
             },
             error: function() {
@@ -495,12 +506,9 @@ function assignControllerToSensorGroup(sensorgroupid, controllerid) {
                     sensorgroups[sensorgroupid].controller_id = undefined;
                 } else {
                     $("#sensorgroup-controllerselect-dropdown").notify("added", "info", {autoHideDelay:1000});
-                    //$("#sensorgroup-controllerbar").html(controllers[controllerid].display_name);
-                    
                     sensorgroups[sensorgroupid].controller_id = controllerid;
                 }
                 $(".sensorgroup > a#" + sensorgroupid).trigger("click");
-                //renderSensorGroupGraph(sensorgroupid, $("#sensorgroup-graph"));
                 getSensorGroups();
             },
             error: function(data) { 
@@ -517,7 +525,7 @@ function addSensorToGroup(sensorid, sensorgroupid) {
             success: function() { 
                 $("#sensorgroup-sensorselect-dropdown").notify("added", "info", {autoHideDelay:1000}); 
                 sensorgroups[sensorgroupid].members[sensorid] = 1; 
-                renderSensorGroupGraph(sensorgroupid, $("#sensorgroup-graph"));
+                sensorGraph(sensorIdsFromGroup(sensorgroupid),["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensorgroup-graph"));
             },
             error: function() { $("#sensorgroup-sensorselect-dropdown").notify("failure to add", "error", {autoHideDelay:1000})}
     });
@@ -530,7 +538,7 @@ function removeSensorFromGroup(sensorid, sensorgroupid) {
             success: function() {
                 $("#sensorgroup-sensorselect-dropdown").notify("removed", "info", {autoHideDelay:1000});
                 delete sensorgroups[sensorgroupid].members[sensorid]
-                renderSensorGroupGraph(sensorgroupid, $("#sensorgroup-graph"));
+                sensorGraph(sensorIdsFromGroup($(".sensorgroup.active > a")[0].id),["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensorgroup-graph"));
             },
             error:   function() {$("#sensorgroup-sensorselect-dropdown").notify("failure to remove", "error", {autoHideDelay:1000})}
     });
