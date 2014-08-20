@@ -27,6 +27,11 @@ const char * mysqlpass;
 
 int sensorhubid;
 
+// Generator sensor configuration
+bool generator;
+int  generator_count;
+int  generator_interval;
+
 //nRF24L01+, raspberry pi vs beaglebone black macros
 #if defined __ARM_ARCH_6__
     RF24 radio("/dev/spidev0.0",8000000 , 25);
@@ -106,6 +111,7 @@ unsigned int get_sensor_id(MYSQL * conn, int sensorid, int sensorhubid);
 MYSQL_ROW sql_select_row(const char * sql);
 void handle_sensor_message(message * message, int addr);
 void handle_pairing_message(message * message, int addr);
-
+void launch_random_generator();
+void insert_fake_sensor(uint8_t sensor_id);
 
 #endif
