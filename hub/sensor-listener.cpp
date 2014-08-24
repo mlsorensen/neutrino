@@ -27,8 +27,8 @@ int main(int argc, char** argv) {
             bool nread = radio.read(&message, sizeof message);
             
             // parse message header
-            int messagetype = 0x00000011 & message.header;
-            int sensoraddr  = (0x00011100 & message.header) >> 2;
+            int messagetype = 0x3 & message.header;
+            int sensoraddr  = (0x1c & message.header) >> 2;
 
             if(nread) {
                 if(messagetype == 0) {
@@ -36,6 +36,7 @@ int main(int argc, char** argv) {
                     handle_sensor_message(&message, sensoraddr);
                 } else if (messagetype == 1) {
                     printf("Got message type 1\n");
+                    printf("Need to pair sensor %d\n", sensoraddr);
                     handle_pairing_message(&message, sensoraddr);
                 }
             } else {
