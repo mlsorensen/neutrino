@@ -1,29 +1,6 @@
 ////`///////////////////////////
 // graph api for sensor data //
 ///////////////////////////////
-
-/*
-var colors = {
-    blue  : [],
-    red   : [],
-    green : []
-};
-
-for (i=1; i <= 5; i++) {
-    var o1  = (i * 40);
-    var o3  = 200 + (i * 10)
-
-    colors.blue.push(rgbToHex(o1, 200-o1, o3));
-    colors.blue.push(rgbToHex(200-o1, o1, o3));
-
-    colors.red.push(rgbToHex(o3, 200-o1, o1));
-    colors.red.push(rgbToHex(o3, o1, 200-o1));
-    
-    colors.green.push(rgbToHex(200-o1, o3, o1));
-    colors.green.push(rgbToHex(o1, o3, 200-o1));
-}
-*/
-
 function componentToHex(c) {
     var hex = c.toString(16);
     return hex.length == 1 ? "0" + hex : hex;
@@ -66,6 +43,7 @@ function sensorGraph( sensorids, axes, colors, time, graphx, graphy, targetdiv) 
     var sensordata = [];
     var dataset = [];
 
+    console.log(sensorids);
     if(axes.length > 2 || axes.length <= 0) {
         // we only support two axes
         targetdiv.html("only one or two axes, please");
@@ -80,18 +58,23 @@ function sensorGraph( sensorids, axes, colors, time, graphx, graphy, targetdiv) 
         graphy = targetdiv.height();
     }
     
-    for( i = 0; i < sensorids.length; i++) {
+    for( var i = 0; i < sensorids.length; i++) {
         var sensorid = sensorids[i];
-        for ( j = 0; j < axes.length; j++) {
-            console.log("fetching data " + axes[j]+ " for sensor" + sensorid);
-            dataset.push({data: getSensorData(sensorid, time, axes[j]), 
-                          label: axes[j],
+        console.log("processing sensor " + sensorid);
+        for ( var j = 0; j < axes.length; j++) {
+            var axis = axes[j];
+            console.log("fetching data " + axis + " for sensor" + sensorid);
+            dataset.push({data: getSensorData(sensorid, time, axis), 
+                          label: axis,
                           color: chooseColor(colors[j], sensorid),
                           lines: {show:true},
                           yaxis: j + 1
                          });
         }
+        console.log("i = " + i + " sensorids.length = " + sensorids.length);
     }
+
+    console.log("finished processing sensor data");
 
     var yaxesdata = [];
     yaxesdata.push({alignTicksWithAxis:1, position:"right", axisLabel:axes[0], autoscaleMargin:.3 });
@@ -138,7 +121,7 @@ function getSensorData(sensor, hours, datatype) {
 function chooseColor(startcolor, id) {
     var rgb = hexToRgb(startcolor);
     var multiplier = id * 20;
-    return rgbToHex(rgb.r + multiplier, rgb.g + multiplier, rgb.b + multiplier);
+    return rgbToHex((rgb.r + multiplier) % 255, (rgb.g + multiplier) % 255, (rgb.b + multiplier) % 255);
 }
 
 
