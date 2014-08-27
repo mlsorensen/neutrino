@@ -20,22 +20,25 @@
 
 #define PAYLOAD_SIZE 17
 
-#define CHANNEL_PIN_0 0
-#define CHANNEL_PIN_1 1
-#define CHANNEL_PIN_2 10
-#define CHANNEL_PIN_3 A3
+#define CHANNEL_PIN_0 10
+#define CHANNEL_PIN_1 A3
+#define CHANNEL_PIN_2 A2
 
 #define ADDRESS_PIN_0 5
 #define ADDRESS_PIN_1 6
 #define ADDRESS_PIN_2 7
-
-#define ENCRYPT_PIN A2
+#define ADDRESS_PIN_3 0
+#define ADDRESS_PIN_4 1
 
 #define PROXIMITY_INT 0
 #define PROXIMITY_PIN 2
-#define BOUNCE_DURATION 20 
 
-#define RF_GOOD_LED 3
+#define PAIRING_INT 1
+#define PAIRING_PIN 3
+
+#define BOUNCE_DURATION 50
+
+#define RF_GOOD_LED A0
 #define RF_BAD_LED 4
 #define LO_BATT_LED A1
 
@@ -47,10 +50,10 @@ void rflog(char * msg);
 long readVcc();
 int getMyAddr();
 int getMyChannel();
-bool shouldEncrypt();
 bool keyIsEmpty(byte * key, int size);
 void generateKey(byte * key, int size);
 void proximityTrigger();
+void pairingTrigger();
 void sendDataMessage();
 void sendPairingMessage();
 
@@ -60,12 +63,13 @@ int mychannel = getMyChannel();
 int32_t lastmillivolts = 0;
 
 volatile bool proximitytrigger = false;
-volatile unsigned long bounceTime=0;
+volatile bool pairingtrigger = false;
+volatile unsigned long bouncetime=0;
 
 // this struct should always be a multiple of 64 bits so we can easily encrypt it (skipjack 64bit blocks)
 // data is passed as integers, therefore decimals are shifted where noted to maintain precision
 struct sensordata {
-    int8_t   addr         = myaddr;
+    uint8_t   addr         = myaddr;
     bool     proximity    = true; // sensor closed or open
     int16_t  tempc        = 0; // temp in centicelsius
     int16_t  humidity     = 0; // humidity in basis points (percent of percent)
@@ -171,32 +175,40 @@ void setup() {
     bsensor.begin(1);
     lastmillivolts = readVcc();
 
-    //TESTING: proximity switch interrupt
+    // proximity switch interrupt
     pinMode(PROXIMITY_PIN, INPUT_PULLUP);
     attachInterrupt(PROXIMITY_INT, proximityTrigger, HIGH);
+
+    // pairing button interrupt
+    pinMode(PAIRING_PIN, INPUT_PULLUP);
+    attachInterrupt(PAIRING_INT, pairingTrigger, LOW);
 }
 
 void proximityTrigger() {
-    if (abs(millis() - bounceTime) > BOUNCE_DURATION) {
+    if (abs(millis() - bouncetime) > BOUNCE_DURATION) {
         proximitytrigger = true;
-        bounceTime = millis();
+        bouncetime = millis();
+    }
+}
+
+void pairingTrigger() {
+    if (abs(millis() - bouncetime) > BOUNCE_DURATION) {
+        pairingtrigger = true;
+        bouncetime = millis();
     }
 }
 
 void loop() {
-    if (shouldEncrypt()) {
-        sendDataMessage();
-    } else {
+    if (digitalRead(PAIRING_PIN) == LOW) {
         sendPairingMessage();
+        pairingtrigger = false;
+    } else {
+        sendDataMessage();
     }
 
     // power down for 56 seconds
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 6; i++) {
         LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
-// this seems unnecessary, as interrupt breaks the loop... ?
-//        if (proximitytrigger == true) {
-//            break;
-//        }
     }
 }
 
@@ -228,34 +240,9 @@ void sendDataMessage() {
         m.data.proximity = false;
     }
     proximitytrigger = false;
-    // THIS SEEMS WRONG...CRUFT. DELETE IT IF THIS DOESN'T BREAK ANYTHING
-    //attachInterrupt(PROXIMITY_INT, proximityTrigger, CHANGE);
-
-    // when encryption is disabled, we send the key. when it is enabled, we send the empty key
-    /*
-    DELETE THIS WHEN WE HAVE NEW MESSAGES WORKING
-    if (! shouldEncrypt()) {
-        
-
-        m.encrypted = true;
-        // hmac the first 88 bits of the sensor data (everything but the signature itself)
-        uint8_t hmac[16];
-        hmac_md5(&hmac, &signaturekey, EEPROM_SIG_KEY_SIZE * 8, &m.s, 88);
-        // populate the signature entry within sensor data, before we encrypt
-        memcpy(&m.s.signature, &hmac, 5);
-
-        // encrypt memory blocks containing sensor data. skipjack is 64 bit (8 byte) blocks
-        for (int i = 0; i < sizeof(m.s); i += 8) {
-            int ptrshift = i * 8;
-            skipjack_enc((&m.s + ptrshift),&encryptionkey);
-        }
-    } else {
-        memcpy(&m.enckey, &encryptionkey, EEPROM_ENC_KEY_SIZE);
-        memcpy(&m.sigkey, &signaturekey, EEPROM_SIG_KEY_SIZE);
-    }*/
 
     uint8_t hmac[16];
-    hmac_md5(&hmac, &signaturekey, EEPROM_SIG_KEY_SIZE * 8, &m.data, 88);
+    hmac_md5(&hmac, &signaturekey, EEPROM_SIG_KEY_SIZE * 8, &m.data, 80);
     memcpy(&m.data.signature, &hmac, SIG_SIZE);
     // encrypt memory blocks containing sensor data. skipjack is 64 bit (8 byte) blocks
     for (int i = 0; i < sizeof(m.data); i += 8) {
@@ -394,11 +381,6 @@ int getMyChannel() {
     pinMode(CHANNEL_PIN_0, INPUT_PULLUP);
     pinMode(CHANNEL_PIN_1, INPUT_PULLUP);
     pinMode(CHANNEL_PIN_2, INPUT_PULLUP);
-    pinMode(CHANNEL_PIN_3, INPUT_PULLUP);
-    
-    if(!digitalRead(CHANNEL_PIN_3)) {
-        result = result + 8;  
-    }
     
     if(!digitalRead(CHANNEL_PIN_2)) {
         result = result + 4;  
@@ -419,8 +401,6 @@ int getMyChannel() {
     digitalWrite(CHANNEL_PIN_1, LOW);
     pinMode(CHANNEL_PIN_2, OUTPUT);
     digitalWrite(CHANNEL_PIN_2, LOW);
-    pinMode(CHANNEL_PIN_3, OUTPUT);
-    digitalWrite(CHANNEL_PIN_3, LOW);
 
     for (int i = 0 ; i < result; i++) {
         pulse(LO_BATT_LED);
@@ -429,20 +409,6 @@ int getMyChannel() {
     // we use channels 60-75
     result += 60;
 
-    return result;
-}
-
-bool shouldEncrypt() {
-    boolean result = false;
-    pinMode(ENCRYPT_PIN, INPUT_PULLUP);
-    
-    if(!digitalRead(ENCRYPT_PIN)) {
-        result = true;   
-    }
-    
-    pinMode(ENCRYPT_PIN, OUTPUT);
-    digitalWrite(ENCRYPT_PIN, LOW);
-    
     return result;
 }
 
