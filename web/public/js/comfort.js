@@ -193,6 +193,7 @@ function populateSensors() {
 
     // populate info on click
     $(".nav-stacked > .sensor > a").on("click", function(event) {
+        clickedsensor = this;
         $(".nav-stacked > .sensor").removeClass('active');
         $(this).parent().addClass('active');
         sensorGraph([$(this)[0].id], ["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensor-graph-upper"));
@@ -248,6 +249,7 @@ function populateSensorGroups(activesensorgroupid) {
     // populate info on selected sensor group 
     $(".nav-stacked > .sensorgroup > a").on("click", function(event) {
         var sensorgroupid = event.target.id;
+        clickedsensorgroup = this;
         var controllerid = sensorgroups[sensorgroupid].controller_id;
         var controller = controllers[controllerid];
         $(".nav-stacked > .sensorgroup").removeClass('active');

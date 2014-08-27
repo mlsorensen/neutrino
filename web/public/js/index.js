@@ -3,6 +3,8 @@ var sensors;
 var sensorgroups;
 var weather;
 var controllers;
+var clickedsensor;
+var clickedsensorgroup;
 
 $(document).ready(function(){
     ////////////////////
@@ -36,6 +38,24 @@ $(document).ready(function(){
         getWeather();
         clearInterval(interval);
     },100);
+
+    // refresh sensor graph if active
+    var sensorgraphinterval = setInterval(function() {
+        if (clickedsensor !== undefined && $(clickedsensor).is(":visible")) {
+             console.log("triggering graph refresh for sensor");
+             console.log(clickedsensor);
+             $(clickedsensor).trigger("click");
+        }
+    }, 60000);
+
+    // refresh sensor graph if active
+    var sensorgroupgraphinterval = setInterval(function() {
+        if (clickedsensorgroup !== undefined && $(clickedsensorgroup).is(":visible")) {
+             console.log("triggering graph refresh for sensorgroup");
+             console.log(clickedsensorgroup);
+             $(clickedsensorgroup).trigger("click");
+        }
+    }, 60000);
 });
 
 function getConfig() {
