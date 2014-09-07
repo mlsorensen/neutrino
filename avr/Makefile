@@ -74,3 +74,7 @@ install: all
 installdev: all
 	@echo !!! flashing AVR, programming default EEPROM values for development !!!
 	$(AVRDUDE) -C$(AVRDUDE_CONF) -v -v -v -v -p$(MCU) -cusbasp -Pusb -Uflash:w:$(BUILDDIR)/$(PROG).hex:i -U eeprom:w:0xa0,0xa1,0xa2,0xa3,0xa4,0xa5,0xa6,0xa7,0xa8,0xa9,0x50,0x51,0x52,0x53:m
+
+installbootloader:
+	$(AVRDUDE) -C$(AVRDUDE_CONF) -v -v -v -v -p$(MCU) -cusbasp -Pusb -e -Ulock:w:0x3F:m -Uefuse:w:0x05:m -Uhfuse:w:0xDA:m -Ulfuse:w:0xFF:m 
+
