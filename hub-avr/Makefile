@@ -6,7 +6,7 @@ INCLUDE      = $(LIBINC) -I $(ARDUINO_CORE)
 MCU          = atmega328p
 PROG         = neutrinohub-avr
 DEFINE       = -DARDUINO=105 -D__AVR_ATmega328P__ -DF_CPU=16000000L -D__PROG_TYPES_COMPAT__
-EXTRA        = -Os -mmcu=$(MCU) -fno-exceptions -ffunction-sections -fdata-sections -Wno-deprecated-declarations -MMD
+EXTRA        = -Os -mmcu=$(MCU) -fno-exceptions -ffunction-sections -fdata-sections -Wno-deprecated-declarations -MMD -lm
 AVRDUDE      = bin/avrdude
 AVRDUDE_CONF = avrdude.conf
 BUILDDIR     = build
@@ -22,14 +22,20 @@ all: $(BUILDDIR)/$(PROG).o
 	avr-objcopy -O ihex -R .eeprom $(BUILDDIR)/$(PROG).elf $(BUILDDIR)/$(PROG).hex
 	avr-size --mcu=$(MCU) --format=avr -C $(BUILDDIR)/$(PROG).elf
 
-$(BUILDDIR)/$(PROG).o: $(PROG).cpp $(patsubst %,$(BUILDDIR)/%.o, $(ARDUINO_CPP) $(ARDUINO_C) )
-	$(CPP) -c $(PROG).cpp -o $@ $(INCLUDE) $(DEFINE) $(EXTRA) -std=c++11
+$(BUILDDIR)/$(PROG).o: $(PROG).cpp $(patsubst %,$(BUILDDIR)/%.o, $(ARDUINO_CPP) $(ARDUINO_C) JsonGenerator JsonParser)
+	$(CPP) -c $(PROG).cpp  -o $@ $(INCLUDE) $(DEFINE) $(EXTRA) -std=c++11 
 
 $(BUILDDIR)/%.o: arduino-core/%.cpp
 	$(CPP) -c $< -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
 $(BUILDDIR)/%.o: arduino-core/%.c
 	$(CC) -c $< -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
+
+$(BUILDDIR)/JsonGenerator.o: libs/JsonGenerator/JsonGenerator.cpp
+	$(CPP) -c $< -o $@ $(INCLUDE) $(DEFINE) $(EXTRA) 
+
+$(BUILDDIR)/JsonParser.o: libs/JsonParser/JsonParser.cpp
+	$(CPP) -c $< -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
 clean:
 	@if [ -e build ]; then echo cleaning build dir; rm -rf build; fi
