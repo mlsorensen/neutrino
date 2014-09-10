@@ -39,8 +39,8 @@ sub new {
     bless($self, $class_name);
 
     if (host_type() eq 'bbb') {
-        $self->{reset_pin} = 51;
-        $self->{serial_port} = '/dev/ttyO1';
+        $self->{reset_pin}    = 51;
+        $self->{serial_port}  = '/dev/ttyO1';
     }
 
     $self->{settings} = shift;
@@ -63,6 +63,39 @@ sub test_msg {
         print("Test message failed: $result->{detail}\n");
     }
 }
+
+sub set_relays {
+    my $self   = shift;
+    my $relays = shift; # list of relay states in order of: heat, cool, fan, humidify, heat2, cool2
+
+    my $msg = to_json({
+        "msgtype"     => "setrelays",
+        "relaystates" => $relays
+    });
+    send_msg($self, $msg);
+    my $result = recv_msg($self);
+
+    if ($result->{result}) {
+        print("Set relays success\n");
+    } else {
+        print("Set relays failed: $result->{detail}\n");
+    }
+}
+
+sub clear_relays {
+    my $self   = shift;
+    
+    my $msg = to_json({ "msgtype" => "clearrelays"});
+    send_msg($self, $msg);
+    my $result = recv_msg($self);
+
+    if ($result->{result}) {
+        print("Clear relays success\n");
+    } else {
+        print("Clear relays failed: $result->{detail}\n");
+    }
+}
+    
 
 sub send_msg {
     my $self = shift;
