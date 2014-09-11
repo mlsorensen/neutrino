@@ -17,7 +17,7 @@ using namespace ArduinoJson::Generator;
 using namespace ArduinoJson::Parser;
 
 void test_relay(int pin);
-void ack(bool success, char * msg);
+void ack(bool success, const char * msg);
 bool update_relays();
 void render_leds();
 void blank_ledcolors();
@@ -73,7 +73,7 @@ void loop() {
 
     // act on message
     if (msg.length() > 0) {
-        char * cstr = new char [msg.length() + 1];
+        char * cstr = new char [msg.length() + 1]();
         strcpy(cstr, msg.c_str());
 
         JsonParser<64> jsonparser;
@@ -81,7 +81,7 @@ void loop() {
         ArduinoJson::Parser::JsonObject incoming = jsonparser.parse(cstr);
 
         if (!incoming.success()) {
-            ack(0,"json failed to parse");
+            ack(0,(const char*)"json failed to parse");
             return;
         }
 
@@ -93,27 +93,58 @@ void loop() {
                 relaystates.humidify = 0;
                 relaystates.heat2    = 0;
                 relaystates.cool2    = 0;
+                update_relays();
+                ack(1, (const char*)"cooling");
             } else if ((bool)incoming["relaystates"]["heat"] == 1) {
                 relaystates.heat     = 1;
                 relaystates.cool     = 0;
                 relaystates.fan      = 1;
                 relaystates.humidify = 0;
                 relaystates.heat2    = 0;
-                relaystates.cool2    = 0; 
+                relaystates.cool2    = 0;
+                update_relays();
+                ack(1, (const char*)"heating");
+            } else if ((bool)incoming["relaystates"]["fan"] == 1) {
+                relaystates.heat     = 0;
+                relaystates.cool     = 0;
+                relaystates.fan      = 1;
+                relaystates.humidify = 0;
+                relaystates.heat2    = 0;
+                relaystates.cool2    = 0;
+                update_relays();
+                ack(1, (const char*)"fan running");
+            } else if ((bool)incoming["relaystates"]["humidify"] == 1) {
+                relaystates.heat     = 0;
+                relaystates.cool     = 0;
+                relaystates.fan      = 1;
+                relaystates.humidify = 1;
+                relaystates.heat2    = 0;
+                relaystates.cool2    = 0;
+                update_relays();
+                ack(1, (const char*)"humidifying");
+            } else if ((bool)incoming["relaystates"]["heat_humidify"] == 1) {
+                relaystates.heat     = 1;
+                relaystates.cool     = 0;
+                relaystates.fan      = 1;
+                relaystates.humidify = 1;
+                relaystates.heat2    = 0;
+                relaystates.cool2    = 0;
+                update_relays();
+                ack(1, (const char*)"heating");
+            } else if ((bool)incoming["relaystates"]["idle"] == 1) {
+                relaystates.heat     = 0;
+                relaystates.cool     = 0;
+                relaystates.fan      = 0;
+                relaystates.humidify = 0;
+                relaystates.heat2    = 0;
+                relaystates.cool2    = 0;
+                update_relays();
+                ack(1, (const char*)"idling");
+            } else {
+                ack(0, (const char*)"provided unknown relay state");
             }
-            update_relays();
-            ack(1, "got relay states");
-        } else if (strcmp(incoming["msgtype"],"clearrelays") == 0) {
-            relaystates.heat     = 0;
-            relaystates.cool     = 0;
-            relaystates.fan      = 0;
-            relaystates.humidify = 0;
-            relaystates.heat2    = 0;
-            relaystates.cool2    = 0;
-            update_relays();
-            ack(1, "got clear relays"); 
         } else if (strcmp(incoming["msgtype"],"test") == 0) {
-            ack(1, "got test");
+            ack(1, (const char*)"got test");
         } else if (strcmp(incoming["msgtype"],"ledcolor") == 0) {
             for (int i = 0; i < LEDCOUNT; i++) {
                 for (int j = 0; j < 3; j++) {
@@ -121,14 +152,14 @@ void loop() {
                 }
             }
             render_leds();
-            ack(1, "set led color");
+            ack(1, (const char*)"set led color");
         } else if (strcmp(incoming["msgtype"],"renderleds") == 0) {
             render_leds();
-            ack(1, "rendered leds");
+            ack(1, (const char*)"rendered leds");
         } else {
-            ack(0, "got unknown msgtype");
+            ack(0, (const char*)"got unknown msgtype");
         }
-        free(cstr);
+        delete[] cstr;
     }
 }
 
@@ -157,7 +188,7 @@ bool update_relays() {
     return true;
 }
 
-void ack(bool success, char * msg) {
+void ack(bool success, const char * msg) {
     ArduinoJson::Generator::JsonObject<3> outgoing;
     outgoing["msgtype"] = "ack";
     outgoing["result"] = success;

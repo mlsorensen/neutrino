@@ -3,6 +3,7 @@ use Data::Dumper;
 use DBI;
 use Getopt::Std;
 use File::Slurp qw|read_file|;
+use Neutrino::Hub;
 use threads;
 use threads::shared;
 
@@ -134,7 +135,7 @@ sub do_cooling {
 }
 
 sub do_heating {
-my $config = shift;
+    my $config = shift;
     foreach my $gpio(keys %{$config->{gpio}}) {
         gpio_off($config->{gpio}->{$gpio}) unless $gpio eq 'heat' or $gpio eq 'fan';
     }

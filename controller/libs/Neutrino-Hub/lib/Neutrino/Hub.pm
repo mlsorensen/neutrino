@@ -108,6 +108,35 @@ sub render_leds {
     }
 }
 
+sub heat {
+    my $self = shift;
+    set_relays($self, {heat => 1});
+}
+
+sub cool {
+    my $self = shift;
+    set_relays($self, {cool => 1});
+}
+
+sub humidify {
+    my $self = shift;
+    set_relays($self, {humidify => 1});
+}
+
+sub heat_humidify {
+    my $self = shift;
+    set_relays($self, {heat_humidify => 1});
+}
+sub fan {
+    my $self = shift;
+    set_relays($self, {fan => 1});
+}
+
+sub idle {
+    my $self = shift;
+    set_relays($self, {idle => 1});
+}
+
 sub set_relays {
     my $self   = shift;
     my $relays = shift; # list of relay states in order of: heat, cool, fan, humidify, heat2, cool2
