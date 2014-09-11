@@ -64,6 +64,50 @@ sub test_msg {
     }
 }
 
+sub color_leds {
+    my $self = shift;
+    my $ledcolors = shift;
+    my $msg = to_json({"msgtype" => "ledcolors", "leds" => $ledcolors});
+    
+    send_msg($self,$msg);
+    my $result = recv_msg($self);
+
+    if ($result->{result}) {
+        print("Color leds message success\n");
+    } else {
+        print("Color leds message failed: $result->{detail}\n");
+    }
+}
+
+sub set_leds {
+    my $self      = shift;
+    my $ledcolors = shift;
+    
+    my $msg = to_json({"msgtype" => "ledcolor", "colors" => $ledcolors});
+    send_msg($self,$msg);
+    my $result = recv_msg($self);
+
+    if ($result->{result}) {
+        print("Color leds message success\n");
+    } else {
+        print("Color leds message failed: $result->{detail}\n");
+    }
+}
+
+sub render_leds {
+    my $self = shift;
+    my $msg = to_json({"msgtype" => "renderleds"});
+
+    send_msg($self,$msg);
+    my $result = recv_msg($self);
+
+    if ($result->{result}) {
+        print("Render led message success\n");
+    } else {
+        print("Render led message failed: $result->{detail}\n");
+    }
+}
+
 sub set_relays {
     my $self   = shift;
     my $relays = shift; # list of relay states in order of: heat, cool, fan, humidify, heat2, cool2

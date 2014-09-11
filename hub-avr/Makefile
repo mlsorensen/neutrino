@@ -22,7 +22,7 @@ all: $(BUILDDIR)/$(PROG).o
 	avr-objcopy -O ihex -R .eeprom $(BUILDDIR)/$(PROG).elf $(BUILDDIR)/$(PROG).hex
 	avr-size --mcu=$(MCU) --format=avr -C $(BUILDDIR)/$(PROG).elf
 
-$(BUILDDIR)/$(PROG).o: $(PROG).cpp $(patsubst %,$(BUILDDIR)/%.o, $(ARDUINO_CPP) $(ARDUINO_C) JsonGenerator JsonParser)
+$(BUILDDIR)/$(PROG).o: $(PROG).cpp $(patsubst %,$(BUILDDIR)/%.o, $(ARDUINO_CPP) $(ARDUINO_C) JsonGenerator JsonParser Adafruit_NeoPixel)
 	$(CPP) -c $(PROG).cpp  -o $@ $(INCLUDE) $(DEFINE) $(EXTRA) -std=c++11 
 
 $(BUILDDIR)/%.o: arduino-core/%.cpp
@@ -35,6 +35,9 @@ $(BUILDDIR)/JsonGenerator.o: libs/JsonGenerator/JsonGenerator.cpp
 	$(CPP) -c $< -o $@ $(INCLUDE) $(DEFINE) $(EXTRA) 
 
 $(BUILDDIR)/JsonParser.o: libs/JsonParser/JsonParser.cpp
+	$(CPP) -c $< -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
+
+$(BUILDDIR)/Adafruit_NeoPixel.o: libs/Adafruit_NeoPixel/Adafruit_NeoPixel.cpp
 	$(CPP) -c $< -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
 clean:

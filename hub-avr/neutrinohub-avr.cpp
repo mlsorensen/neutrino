@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <JsonParser.h>
 #include <JsonGenerator.h>
+#include <Adafruit_NeoPixel.h>
 
 #define HEAT_PIN     2
 #define COOL_PIN     3
@@ -9,12 +10,17 @@
 #define HEAT2_PIN    9
 #define COOL2_PIN    10
 
+#define LEDPIN       6
+#define LEDCOUNT     12
+
 using namespace ArduinoJson::Generator;
 using namespace ArduinoJson::Parser;
 
 void test_relay(int pin);
 void ack(bool success, char * msg);
 bool update_relays();
+void render_leds();
+void blank_ledcolors();
 
 struct Relaystates {
     bool heat     = 0;
@@ -24,6 +30,9 @@ struct Relaystates {
     bool heat2    = 0;
     bool cool2    = 0;
 } relaystates;
+
+int ledcolors [LEDCOUNT][3];
+Adafruit_NeoPixel leds = Adafruit_NeoPixel(LEDCOUNT, LEDPIN, NEO_GRB + NEO_KHZ800);
 
 int my_putc( char c, FILE *t) {
     Serial.write( c );
@@ -40,6 +49,10 @@ void setup() {
     pinMode(HUMIDIFY_PIN, OUTPUT);
     pinMode(HEAT2_PIN, OUTPUT);
     pinMode(COOL2_PIN, OUTPUT);
+
+    leds.begin();
+    blank_ledcolors();
+    render_leds();
 }
 
 void loop() {
@@ -62,9 +75,10 @@ void loop() {
     if (msg.length() > 0) {
         char * cstr = new char [msg.length() + 1];
         strcpy(cstr, msg.c_str());
+
+        JsonParser<64> jsonparser;
         
-        JsonParser<32> parser;
-        ArduinoJson::Parser::JsonObject incoming = parser.parse(cstr);
+        ArduinoJson::Parser::JsonObject incoming = jsonparser.parse(cstr);
 
         if (!incoming.success()) {
             ack(0,"json failed to parse");
@@ -100,10 +114,37 @@ void loop() {
             ack(1, "got clear relays"); 
         } else if (strcmp(incoming["msgtype"],"test") == 0) {
             ack(1, "got test");
+        } else if (strcmp(incoming["msgtype"],"ledcolor") == 0) {
+            for (int i = 0; i < LEDCOUNT; i++) {
+                for (int j = 0; j < 3; j++) {
+                    ledcolors[i][j] = atoi((char*)incoming["colors"][i][j]);
+                }
+            }
+            render_leds();
+            ack(1, "set led color");
+        } else if (strcmp(incoming["msgtype"],"renderleds") == 0) {
+            render_leds();
+            ack(1, "rendered leds");
         } else {
             ack(0, "got unknown msgtype");
         }
+        free(cstr);
     }
+}
+
+void blank_ledcolors() {
+    for (int i=0; i < LEDCOUNT; i++) {
+        for (int j=0; j < 3; j++) {
+            ledcolors[i][j] = 0;
+        }
+    }
+}
+
+void render_leds() {
+    for (int i=0; i < LEDCOUNT; i++) {
+        leds.setPixelColor(i, leds.Color(ledcolors[i][0], ledcolors[i][1], ledcolors[i][2]));
+    }
+    leds.show();
 }
 
 bool update_relays() {
