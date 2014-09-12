@@ -6,7 +6,7 @@ my $h = new Neutrino::Hub({"debug" => 1});
 #$h->test_msg();
 #$h->reset();
 #sleep 2;
-$h->cool();
+$h->humidify();
 #$h->clear_relays();
 #sleep 2;
 #$h->set_relays({cool=>1});
