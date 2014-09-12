@@ -18,8 +18,17 @@
                 <span id="sensor-address-label" class="input-group-addon">address</span>
                 <input id="sensor-address-input" type="text" class="form-control" disabled>
             </div>
-            <span id='sensor-voltage-span' class="label label-default pull-right" style="font-size:1.3em">
-            <div class="glyphicon glyphicon-flash pull-left" /><div id='sensor-voltage-value' class='pull-right'>Volts</div></span>
+            <div class="pull-right" style="padding:0px 10px">
+                <span id='sensor-delete'  class="label label-default pull-right" style="font-size:1.3em;background-color:#8F2400;color:white">
+                    <div class="glyphicon glyphicon-remove pull-left" />
+                </span>
+            </div>
+            <div class="pull-right">
+                <span id='sensor-voltage-span' class="label label-default pull-right" style="font-size:1.3em">
+                    <div class="glyphicon glyphicon-flash pull-left" />
+                    <div id='sensor-voltage-value' class='pull-right'>Volts</div>
+                </span>
+            </div>
         </div>
         <div id="sensor-detail-inner" class="panel-body">
             <div id="sensor-graph-upper" style="width:600px;height:300px;"></div>

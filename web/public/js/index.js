@@ -56,6 +56,20 @@ $(document).ready(function(){
              $(clickedsensorgroup).trigger("click");
         }
     }, 60000);
+
+    // add notification styles
+    $.notify.addStyle('confirm-popup', {
+    html: 
+    "<div>" +
+        "<div class='clearfix' style='background-color:#ebebeb;border-radius:10px;padding:5px'>" +
+            "<div style='width:150px;height:40px' class='confirm-popup-title' data-notify-html='title'/>" +
+            "<div class='confirm-popup-buttons'>" +
+                "<button class='confirm-no' style='padding:5px' >No</button>" +
+                "<button class='confirm-yes' style='padding:5px' >Yes</button>" +
+            "</div>" +
+        "</div>" +
+    "</div>"
+    });
 });
 
 function getConfig() {

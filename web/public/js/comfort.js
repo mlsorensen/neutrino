@@ -71,6 +71,22 @@ $(document).on('DOMNodeInserted', function(event) {
             clearInterval(interval);
             populateSensors();
         }, 200);
+
+        $("#sensor-delete").on("click", function(event) {
+            $("#sensor-delete").notify({title:"Are you sure?", button:''}, {style:'confirm-popup', autoHide: false, clickToHide: false});
+            var sensoraddr = $(".active.sensor > a")[0].id;
+            $(document).on('click', '.confirm-no', function() {
+                $(this).trigger('notify-hide');
+            });
+            $(document).on('click', '.confirm-yes', function() {
+                deleteSensor(sensoraddr);
+                $(this).trigger('notify-hide');
+            });
+        }).hover(function(){
+            $("#sensor-delete").css("background-color","red");
+        }, function(){
+            $("#sensor-delete").css("background-color","#8F2400");
+        });
     }
 
     // sensorgroups
@@ -129,6 +145,19 @@ $(document).on('DOMNodeInserted', function(event) {
         });
     } 
 });
+
+function deleteSensor(sensorid) {
+    $.ajax({url:     "/api/sensors/" + sensorid,
+            type:    "DELETE",
+            async:   false,
+            success: function() {
+                delete sensors[sensorid];
+                $("#sensor-nav-list > li > a#" + sensorid).remove();    
+                $(".nav-stacked > .sensor > a").first().trigger("click");
+            },
+            error:   function() {$("#sensor-delete").notify("failed to delete", "error", {autoHideDelay:1000})}
+    });
+}
 
 function renderVoltage(sensor) {
     $.getJSON("/api/sensors/" + sensor[0].id + "/data?value=voltage&hours=1", function (data) {
@@ -207,7 +236,7 @@ function populateSensors() {
 
     // save sensor name edit
     $("#sensor-name-save").on("click", function(event) {
-        var sensorid = $(".active.sensor > a")[0].id
+        var sensorid = $(".active.sensor > a")[0].id;
         var newname = $("#sensor-name-input").val();
         $.post("/api/sensors/" + sensorid + "/name", {"value": newname}, function(data) {
             $("#sensor-name-save").notify(data.text, "info");
@@ -445,7 +474,7 @@ function removeSensorFromGroup(sensorid, sensorgroupid) {
             async:   false,
             success: function() {
                 $("#sensorgroup-sensorselect-dropdown").notify("removed", "info", {autoHideDelay:1000});
-                delete sensorgroups[sensorgroupid].members[sensorid]
+                delete sensorgroups[sensorgroupid].members[sensorid];
                 sensorGraph(sensorIdsFromGroup($(".sensorgroup.active > a")[0].id),["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensorgroup-graph"));
             },
             error:   function() {$("#sensorgroup-sensorselect-dropdown").notify("failure to remove", "error", {autoHideDelay:1000})}
