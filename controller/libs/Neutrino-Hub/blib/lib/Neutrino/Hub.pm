@@ -64,21 +64,6 @@ sub test_msg {
     }
 }
 
-sub color_leds {
-    my $self = shift;
-    my $ledcolors = shift;
-    my $msg = to_json({"msgtype" => "ledcolors", "leds" => $ledcolors});
-    
-    send_msg($self,$msg);
-    my $result = recv_msg($self);
-
-    if ($result->{result}) {
-        print("Color leds message success\n");
-    } else {
-        print("Color leds message failed: $result->{detail}\n");
-    }
-}
-
 sub set_leds {
     my $self      = shift;
     my $ledcolors = shift;
@@ -106,6 +91,35 @@ sub render_leds {
     } else {
         print("Render led message failed: $result->{detail}\n");
     }
+}
+
+sub heat {
+    my $self = shift;
+    set_relays($self, {heat => 1});
+}
+
+sub cool {
+    my $self = shift;
+    set_relays($self, {cool => 1});
+}
+
+sub humidify {
+    my $self = shift;
+    set_relays($self, {humidify => 1});
+}
+
+sub heat_humidify {
+    my $self = shift;
+    set_relays($self, {heat_humidify => 1});
+}
+sub fan {
+    my $self = shift;
+    set_relays($self, {fan => 1});
+}
+
+sub idle {
+    my $self = shift;
+    set_relays($self, {idle => 1});
 }
 
 sub set_relays {

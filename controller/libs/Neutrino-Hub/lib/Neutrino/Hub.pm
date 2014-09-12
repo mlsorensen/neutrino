@@ -64,21 +64,6 @@ sub test_msg {
     }
 }
 
-sub color_leds {
-    my $self = shift;
-    my $ledcolors = shift;
-    my $msg = to_json({"msgtype" => "ledcolors", "leds" => $ledcolors});
-    
-    send_msg($self,$msg);
-    my $result = recv_msg($self);
-
-    if ($result->{result}) {
-        print("Color leds message success\n");
-    } else {
-        print("Color leds message failed: $result->{detail}\n");
-    }
-}
-
 sub set_leds {
     my $self      = shift;
     my $ledcolors = shift;
