@@ -167,96 +167,19 @@ function getSensorData(sensor, hours, datatype) {
     return graphdata;
 }
 
-function renderSensorGraph(sensor, value, hours, targetdiv) {
-    var temperaturedata = getSensorData(sensor, hours, config.tempunits.value);
-    var humiditydata    = getSensorData(sensor, hours, "humidity");
-    var templabel = 'Degrees ' + config.tempunits.value;
-    var humlabel = 'Humidity % ';
-    if (temperaturedata.length > 0) {
-        var dataset = [{data:humiditydata, label:humlabel, color:"green", lines:{show:true}, yaxis: 2},
-                       {data:temperaturedata, label:templabel, color: "#0062E3", lines:{show:true}}];
-        var options = {
-            axisLabels: {show:true},
-            series: {shadowSize:5, lines:{show:true},},
-            xaxes: [{mode:"time", timezone: "browser", twelveHourClock: true}],
-            yaxes: [{alignTicksWithAxis:1, position:"right", axisLabel:templabel, autoscaleMargin:.3},
-                    {alignTicksWithAxis:1, position:"left", axisLabel:humlabel, autoscaleMargin:.3}],
-            legend: {position:'sw'}
-        };
-
-        $.plot(targetdiv, dataset, options );
-        targetdiv.css("background", "linear-gradient(to top, #ebebeb , white)");
-    }
-}
-
-function renderSensorGroupGraph(sensorgroupid, targetdiv) {
-    var dataset = [];
-    var humlabel = 'Humidity %';
-    var templabel = 'Degrees ' + config.tempunits.value;
-    var controllerid = sensorgroups[sensorgroupid].controller_id;
-    var options = {};
-    console.log("rendering graph for sensor group " + sensorgroupid);
-
+function sensorIdsFromGroup(sensorgroupid) {
     if (Object.keys(sensorgroups[sensorgroupid].members).length == 0) {
         console.log("no sensors attached to group");
-        targetdiv.addClass('hidden');
         return;
     }
 
-    if (controllerid == null || (controllerid != null && getLimitsAxis(controllerid) == 1 )) {
-        for (var sensorid in sensorgroups[sensorgroupid].members) {
-            var sensortempdata = getSensorData(sensorid, config.graphtime.value, config.tempunits.value);
-            dataset.push({data:sensortempdata, label: sensors[sensorid].display_name + " temp", color:colors.blue[sensorid], lines:{show:true}});
-        }
-    }
+    var ids = [];
+    console.log(sensorgroups[sensorgroupid]);
 
-    if (controllerid == null || (controllerid != null && getLimitsAxis(controllerid) == 2 )) {
-        for (var sensorid in sensorgroups[sensorgroupid].members) {
-            var humiditydata = getSensorData(sensorid, config.graphtime.value, "humidity");
-            dataset.push({data:humiditydata, label:sensors[sensorid].display_name + " hum", color:colors.green[sensorid], lines:{show:true}, yaxis:2});
-        }
-    }
-
-    if (controllerid != null && controllers[controllerid].setpoint != null) {
-        var start    = dataset[0].data[0][0];
-        var end      = dataset[0].data[dataset[0].data.length - 1][0];
-        var setpoint = controllers[controllerid].setpoint;
-        var upper    = parseFloat(setpoint) + parseFloat(controllers[controllerid].tolerance);
-        var lower    = parseFloat(setpoint) - parseFloat(controllers[controllerid].tolerance);
-        dataset.push({data:[[start, upper],[end, upper]],
-                      label:'upper limit',
-                      color:"red",
-                      lines:{show:true,lineWidth:1},
-                      yaxis: getLimitsAxis(controllerid)
-                     });
-        dataset.push({data:[[start, lower],[end, lower]],
-                      label:'lower limit',
-                      color:"red",
-                      lines:{show:true,lineWidth:1},
-                      yaxis: getLimitsAxis(controllerid)
-                     });
-    }
-
-    var options = {
-        axisLabels: {show:true},
-        series: {shadowSize:5, lines:{show:true},},
-        xaxes: [{mode:"time", timezone: "browser", twelveHourClock: true}],
-        yaxes: [{alignTicksWithAxis:1, position:"right", axisLabel:templabel, autoscaleMargin:.3 },
-                {alignTicksWithAxis:1, position:"left", axisLabel:humlabel, autoscaleMargin:.3}],
-        legend: {position:'sw'}
-    };
-
-    targetdiv.removeClass('hidden'); 
-    $.plot(targetdiv, dataset, options );
-    targetdiv.css("background", "linear-gradient(to top, #ebebeb , white)");
-}
-
-function getLimitsAxis(controllerid) {
-    if (controllers[controllerid].type == 'temperature') {
-        return 1;
-    } else {
-        return 2;
-    }
+    Object.keys(sensorgroups[sensorgroupid].members).forEach(function(member) {
+        ids.push(sensorgroups[sensorgroupid].members[member].id);
+    });
+    return ids;
 }
 
 function populateSensors() {
@@ -270,11 +193,13 @@ function populateSensors() {
 
     // populate info on click
     $(".nav-stacked > .sensor > a").on("click", function(event) {
+        clickedsensor = this;
         $(".nav-stacked > .sensor").removeClass('active');
         $(this).parent().addClass('active');
-        renderSensorGraph($(this)[0].id, "temperature", config.graphtime.value, $("#sensor-graph"));
+        sensorGraph([$(this)[0].id], ["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensor-graph-upper"));
+        sensorGraph([$(this)[0].id], ["Humidity"], ["AA0033"],config.graphtime.value, null, null, $("#sensor-graph-lower"));
         $("#sensor-name-input").val($(this).html());
-        $("#sensor-panel-title").html(event.target.id);
+        $("#sensor-address-input").val(sensors[$(this)[0].id].sensor_address);
         renderVoltage($(this));
     });
 
@@ -324,6 +249,7 @@ function populateSensorGroups(activesensorgroupid) {
     // populate info on selected sensor group 
     $(".nav-stacked > .sensorgroup > a").on("click", function(event) {
         var sensorgroupid = event.target.id;
+        clickedsensorgroup = this;
         var controllerid = sensorgroups[sensorgroupid].controller_id;
         var controller = controllers[controllerid];
         $(".nav-stacked > .sensorgroup").removeClass('active');
@@ -392,13 +318,6 @@ function populateSensorGroups(activesensorgroupid) {
             });
         } else {
             $("#sensorgroup-controllerbar").addClass("hidden");
-            /*$("#controllerbar-name").html("No controller attached");
-            $("#controllerbar-status").html("");
-            $("#controllerbar-setpointtable").addClass("hidden");
-            $("#controllerbar-tolerancetable").addClass("hidden");
-            $("#controllerbar-fanmodetable").addClass("hidden");
-            $("#controllerbar-enabledropdown").addClass("hidden");
-    */
         }
 
         // populate controller select dropdown
@@ -453,7 +372,7 @@ function populateSensorGroups(activesensorgroupid) {
         });
 
         // render group graph
-        renderSensorGroupGraph(sensorgroupid, $("#sensorgroup-graph"));
+        sensorGraph(sensorIdsFromGroup(sensorgroupid), ["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensorgroup-graph"));
     });
 
     // select a group to show by default
@@ -473,7 +392,7 @@ function controllerSaveSetting(controllerid, targetdiv, settingvalue, settingnam
                 targetdiv.html(settingvalue + " ");
                 targetdiv.notify("success","info", {autoHideDelay:1000});
                 controllers[controllerid][settingname] = settingvalue;
-                renderSensorGroupGraph($(".sensorgroup.active > a")[0].id, $("#sensorgroup-graph"));
+                sensorGraph(sensorIdsFromGroup($(".sensorgroup.active > a")[0].id),["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensorgroup-graph"));
                 return 1;
             },
             error: function() {
@@ -495,12 +414,9 @@ function assignControllerToSensorGroup(sensorgroupid, controllerid) {
                     sensorgroups[sensorgroupid].controller_id = undefined;
                 } else {
                     $("#sensorgroup-controllerselect-dropdown").notify("added", "info", {autoHideDelay:1000});
-                    //$("#sensorgroup-controllerbar").html(controllers[controllerid].display_name);
-                    
                     sensorgroups[sensorgroupid].controller_id = controllerid;
                 }
                 $(".sensorgroup > a#" + sensorgroupid).trigger("click");
-                //renderSensorGroupGraph(sensorgroupid, $("#sensorgroup-graph"));
                 getSensorGroups();
             },
             error: function(data) { 
@@ -517,7 +433,7 @@ function addSensorToGroup(sensorid, sensorgroupid) {
             success: function() { 
                 $("#sensorgroup-sensorselect-dropdown").notify("added", "info", {autoHideDelay:1000}); 
                 sensorgroups[sensorgroupid].members[sensorid] = 1; 
-                renderSensorGroupGraph(sensorgroupid, $("#sensorgroup-graph"));
+                sensorGraph(sensorIdsFromGroup(sensorgroupid),["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensorgroup-graph"));
             },
             error: function() { $("#sensorgroup-sensorselect-dropdown").notify("failure to add", "error", {autoHideDelay:1000})}
     });
@@ -530,7 +446,7 @@ function removeSensorFromGroup(sensorid, sensorgroupid) {
             success: function() {
                 $("#sensorgroup-sensorselect-dropdown").notify("removed", "info", {autoHideDelay:1000});
                 delete sensorgroups[sensorgroupid].members[sensorid]
-                renderSensorGroupGraph(sensorgroupid, $("#sensorgroup-graph"));
+                sensorGraph(sensorIdsFromGroup($(".sensorgroup.active > a")[0].id),["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensorgroup-graph"));
             },
             error:   function() {$("#sensorgroup-sensorselect-dropdown").notify("failure to remove", "error", {autoHideDelay:1000})}
     });
