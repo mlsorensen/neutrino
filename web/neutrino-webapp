@@ -196,7 +196,7 @@ get "/sensorgroups" => sub {
                                     "from sensor,sensor_tie where sensor_tie.sensor_id = sensor.id and sensor_tie.sensorgroup_id=?");
             $sth->execute($key);
             if(!$dbh->errstr()) {
-                $data->{$key}->{members} = $sth->fetchall_hashref('id');
+                $data->{$key}->{members} = $sth->fetchall_hashref('sensor_address');
             }
             $sth->finish();
         }

@@ -206,7 +206,7 @@ function sensorIdsFromGroup(sensorgroupid) {
     console.log(sensorgroups[sensorgroupid]);
 
     Object.keys(sensorgroups[sensorgroupid].members).forEach(function(member) {
-        ids.push(sensorgroups[sensorgroupid].members[member].id);
+        ids.push(sensorgroups[sensorgroupid].members[member].sensor_address);
     });
     return ids;
 }
