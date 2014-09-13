@@ -174,12 +174,12 @@ sub recv_msg {
     open(PORT, "<$self->{serial_port}");
     flock(PORT, LOCK_EX);
     my $jsonmsg = <PORT>;
-    my $msg = from_json($jsonmsg);
-    #TODO: handle bad json
-    close PORT;
     if ($self->{settings}->{debug}) {
         print "DEBUG: recv_msg: $jsonmsg";
     }
+    my $msg = from_json($jsonmsg);
+    #TODO: handle bad json
+    close PORT;
     return $msg;
 }
 

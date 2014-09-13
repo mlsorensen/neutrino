@@ -21,6 +21,7 @@ void ack(bool success, const char * msg);
 bool update_relays();
 void render_leds();
 void blank_ledcolors();
+bool is_idle();
 
 struct Relaystates {
     bool heat     = 0;
@@ -41,7 +42,7 @@ int my_putc( char c, FILE *t) {
 void setup() {
     fdevopen( &my_putc, 0);
     Serial.begin(57600);
-    printf("Starting AVR\r\n");
+    printf("starting avr\r\n");
 
     pinMode(HEAT_PIN, OUTPUT);
     pinMode(COOL_PIN, OUTPUT);
@@ -56,7 +57,7 @@ void setup() {
 }
 
 void loop() {
-    String msg; 
+    String msg;
 
     // fetch json message
     if(Serial.available()) {
@@ -132,14 +133,21 @@ void loop() {
                 update_relays();
                 ack(1, (const char*)"heating");
             } else if ((bool)incoming["relaystates"]["idle"] == 1) {
-                relaystates.heat     = 0;
-                relaystates.cool     = 0;
-                relaystates.fan      = 0;
-                relaystates.humidify = 0;
-                relaystates.heat2    = 0;
-                relaystates.cool2    = 0;
-                update_relays();
-                ack(1, (const char*)"idling");
+                if (is_idle()) {
+                    ack(1, (const char*)"already idle");
+                } else {
+                    relaystates.heat     = 0;
+                    relaystates.cool     = 0;
+                    relaystates.fan      = 1;
+                    relaystates.humidify = 0;
+                    relaystates.heat2    = 0;
+                    relaystates.cool2    = 0;
+                    update_relays();
+                    relaystates.fan      = 0;
+                    delay(30000);
+                    update_relays();
+                    ack(1, (const char*)"idling, wait 30 seconds");
+                }
             } else {
                 ack(0, (const char*)"provided unknown relay state");
             }
@@ -161,6 +169,10 @@ void loop() {
         }
         delete[] cstr;
     }
+}
+
+bool is_idle() {
+    return relaystates.heat == 0 && relaystates.cool == 0 && relaystates.fan == 0 && relaystates.humidify == 0 && relaystates.heat2 == 0 && relaystates.cool2 == 0;
 }
 
 void blank_ledcolors() {
