@@ -80,7 +80,9 @@ sub handle_settings {
     } elsif ($state eq "cool") {
         #do_cooling($config);
         $hub->cool();
-    } else {
+    } elsif ($state eq "fan") {
+        $hub->fan();
+    }else {
         #do_idle($config);
         $hub->idle();
     }
@@ -92,6 +94,11 @@ sub state_classifier {
     my $caps   = $config->{settings}->{capabilities};
 
     my $newstate = "idle";
+
+    # fan on only
+    if (exists $caps->{heat} && $config->{settings}->{fan_mode} eq 'on') {
+        $newstate = "fan";
+    }
 
     # heat. If we were already heating, use setpoint + 1 as the cutoff.
     # the idea is that given setpoint 72 deg we don't start heating at 71.99 deg and stop at 72.01, we push up to 73.

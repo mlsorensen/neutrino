@@ -286,10 +286,13 @@ function populateSensorGroups(activesensorgroupid) {
         $("#sensorgroup-name-input").val($(this).html());
 
         if (controller != undefined) {
+            console.log("Controller:");
+            console.log(controller);
             $("#sensorgroup-controllerbar").removeClass('hidden');
             $("#controllerbar-name").html(controller.display_name + "&nbsp:");
-            $("#controllerbar-setpoint").html(controller.setpoint + " ");
-            $("#controllerbar-tolerance").html(controller.tolerance + " ");
+            $("#controllerbar-mintemp").html(controller.capabilities.heat.setpoint + " ");
+            $("#controllerbar-maxtemp").html(controller.capabilities.cool.setpoint + " ");
+            $("#controllerbar-humidity").html(controller.capabilities.humidify.setpoint + " ");
             $("#controllerbar-fanmode").html(controller.fan_mode + " ");
             if (controller.status == "idle") {
                 $("#controllerbar-status").html("<b style='color:green'>&nbsp idle</b>");
@@ -300,34 +303,44 @@ function populateSensorGroups(activesensorgroupid) {
             } else if (controller.status == "humidifying") {
                 $("#controllerbar-status").html("<b style='color:dodgerblue'>&nbsp humidifying</b>");
             }
-            if (controller.enabled == 1) {
-                $("#controllerbar-enabled").html("on ");
-            } else if (controller.enabled == 0) {
-                $("#controllerbar-enabled").html("off ");
+            if (controller.enabled == "on") {
+                $("#controllerbar-enable").html("on ");
+            } else if (controller.enabled == "off") {
+                $("#controllerbar-enable").html("off ");
             } else {
-                $("#controllerbar-enabled").html("? ");
+                $("#controllerbar-enable").html("? ");
             }
-            $("#controllerbar-setpointtable").removeClass("hidden");
-            $("#controllerbar-tolerancetable").removeClass("hidden");
+            $("#controllerbar-mintemptable").removeClass("hidden");
+            $("#controllerbar-maxtemptable").removeClass("hidden");
+            $("#controllerbar-humiditytable").removeClass("hidden");
             $("#controllerbar-fanmodetable").removeClass("hidden");
             $("#controllerbar-enabledropdown").removeClass("hidden");
 
-            // populate setpoint options
-            $("#controllerbar-setpoint-list").html('');
-            for (var i = 0; i < 100; i++) {
-                $("#controllerbar-setpoint-list").append("<li><a class='controllerbar-setpoint-item' href='#'>" + i + "</a></li>");
+            // populate mintemp options
+            $("#controllerbar-mintemp-list").html('');
+            for (var i = 50; i < 90; i++) {
+                $("#controllerbar-mintemp-list").append("<li><a class='controllerbar-mintemp-item' href='#'>" + i + "</a></li>");
             }
-            $("#controllerbar-setpoint-list > li > a").on("click", function(e) {
-                controllerSaveSetting(controller.id, $("#controllerbar-setpoint"), $(this).html(), "setpoint");
+            $("#controllerbar-mintemp-list > li > a").on("click", function(e) {
+                controllerSaveSetting(controller.id, $("#controllerbar-mintemp"), $(this).html(), "heat");
             });
 
-            // populate tolerance options
-            $("#controllerbar-tolerance-list").html('');
-            for (var i = 2; i <= 10; i++) {
-                $("#controllerbar-tolerance-list").append("<li><a class='controllerbar-tolerance-item' href='#'>" + i + "</a></li>");
+            // populate maxtemp options
+            $("#controllerbar-maxtemp-list").html('');
+            for (var i = 50; i <= 90; i++) {
+                $("#controllerbar-maxtemp-list").append("<li><a class='controllerbar-maxtemp-item' href='#'>" + i + "</a></li>");
             }
-            $("#controllerbar-tolerance-list > li > a").on("click", function(e) {
-                controllerSaveSetting(controller.id, $("#controllerbar-tolerance"), $(this).html(), "tolerance");
+            $("#controllerbar-maxtemp-list > li > a").on("click", function(e) {
+                controllerSaveSetting(controller.id, $("#controllerbar-maxtemp"), $(this).html(), "cool");
+            });
+
+             // populate humidify options
+            $("#controllerbar-humidity-list").html('');
+            for (var i = 0; i <= 50; i++) {
+                $("#controllerbar-humidity-list").append("<li><a class='controllerbar-humidity-item' href='#'>" + i + "</a></li>");
+            }
+            $("#controllerbar-humidity-list > li > a").on("click", function(e) {
+                controllerSaveSetting(controller.id, $("#controllerbar-humidity"), $(this).html(), "humidify");
             });
 
             // populate fanmode options
@@ -401,7 +414,11 @@ function populateSensorGroups(activesensorgroupid) {
         });
 
         // render group graph
-        sensorGraph(sensorIdsFromGroup(sensorgroupid), ["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensorgroup-graph"));
+        if (controller !== undefined) {
+            sensorGraph(sensorIdsFromGroup(sensorgroupid), ["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensorgroup-graph"), controller);
+        } else {
+            sensorGraph(sensorIdsFromGroup(sensorgroupid), ["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensorgroup-graph"));
+        }
     });
 
     // select a group to show by default
@@ -420,8 +437,11 @@ function controllerSaveSetting(controllerid, targetdiv, settingvalue, settingnam
             success: function() {
                 targetdiv.html(settingvalue + " ");
                 targetdiv.notify("success","info", {autoHideDelay:1000});
-                controllers[controllerid][settingname] = settingvalue;
-                sensorGraph(sensorIdsFromGroup($(".sensorgroup.active > a")[0].id),["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensorgroup-graph"));
+                if ( settingname == "heat" || settingname == "cool" || settingname == "humidify") {
+                    controllers[controllerid].capabilities[settingname].setpoint = settingvalue;
+                }
+                getControllers();
+                sensorGraph(sensorIdsFromGroup($(".sensorgroup.active > a")[0].id),["Fahrenheit"], ["00AA33"],config.graphtime.value, null, null, $("#sensorgroup-graph"), controllers[controllerid]);
                 return 1;
             },
             error: function() {

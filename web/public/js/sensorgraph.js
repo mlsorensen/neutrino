@@ -39,7 +39,7 @@ graphy    = graph should be y pixels tall, null inherits height from targetdiv
 targetdiv = location to render graph
 */
 
-function sensorGraph( sensorids, axes, colors, time, graphx, graphy, targetdiv) {
+function sensorGraph(sensorids, axes, colors, time, graphx, graphy, targetdiv, controller) {
     var sensordata = [];
     var dataset = [];
 
@@ -58,14 +58,18 @@ function sensorGraph( sensorids, axes, colors, time, graphx, graphy, targetdiv) 
         graphy = targetdiv.height();
     }
     
+    var tempgraph = 0;
     for( var i = 0; i < sensorids.length; i++) {
         var sensorid = sensorids[i];
         console.log("processing sensor " + sensorid);
         for ( var j = 0; j < axes.length; j++) {
             var axis = axes[j];
+            if (axis.toLowerCase() == 'fahrenheit' || axis.toLowerCase() == 'celsius') {
+                tempgraph = 1;
+            }
             console.log("fetching data " + axis + " for sensor" + sensorid);
-            dataset.push({data: getSensorData(sensorid, time, axis), 
-                          label: axis,
+            dataset.push({data: getSensorData(sensorid, time, axis.toLowerCase()), 
+                          label: sensors[sensorid].display_name,
                           color: chooseColor(colors[j], sensorid),
                           lines: {show:true},
                           yaxis: j + 1
@@ -75,6 +79,23 @@ function sensorGraph( sensorids, axes, colors, time, graphx, graphy, targetdiv) 
     }
 
     console.log("finished processing sensor data");
+
+    // add control bars if necessary
+    if (tempgraph && controller !== undefined) {
+        console.log("temperature graph found, fetching control bars");
+        var min = [];
+        var max = [];
+        if (controller.capabilities.heat !== undefined) {
+            min[0] = [dataset[0].data[0][0], controller.capabilities.heat.setpoint];
+            min[1] = [dataset[0].data[dataset[0].data.length-1][0], controller.capabilities.heat.setpoint];
+            dataset.push({data:min, label:"mintemp", color:"blue", lines: {show:true},yaxis: 1});
+        }
+        if (controller.capabilities.cool !== undefined) {
+            max[0] = [dataset[0].data[0][0], controller.capabilities.cool.setpoint];
+            max[1] = [dataset[0].data[dataset[0].data.length-1][0], controller.capabilities.cool.setpoint];
+            dataset.push({data:max, label:"maxtemp", color:"red", lines: {show:true},yaxis: 1});
+        }
+    }
 
     var yaxesdata = [];
     yaxesdata.push({alignTicksWithAxis:1, position:"right", axisLabel:axes[0], autoscaleMargin:.3 });
@@ -108,6 +129,8 @@ function getSensorData(sensor, hours, datatype) {
     }).responseText);
 
     if (data.result) {
+        console.log("SENSOR DATA");
+        console.log(data);
         for (i = 0; i < data.payload.length; i++) {
             var element = [];
             element[0] = data.payload[i].epoch * 1000;
