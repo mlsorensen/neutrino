@@ -25,7 +25,11 @@ bool is_idle();
 void animate(const char * animation, int color[3]);
 void smiley_face();
 void dual_sweep_up(int r, int g, int b, int wait);
+void dual_sweep_down(int r, int g, int b, int wait);
 void fade_in_two(int ledleft, int ledright, int up, int r, int g, int b, int wait);
+void fade_out(int*, int, int, int, int, int);
+void fade_in(int*, int, int, int, int, int);
+void fan();
 
 struct Relaystates {
     bool heat     = 0;
@@ -190,6 +194,10 @@ void animate(const char * animation, int color[3]) {
         smiley_face();
     } else if (strcmp(animation, "dual_sweep_up") == 0) {
         dual_sweep_up(color[0], color[1], color[2], 1000);
+    } else if (strcmp(animation, "dual_sweep_down") == 0) {
+        dual_sweep_down(color[0], color[1], color[2], 1000);
+    } else if (strcmp(animation, "fan") == 0) {
+        fan();
     }
 }
 
@@ -277,6 +285,16 @@ void dual_sweep_up(int r, int g, int b, int wait) {
     render_leds();
 }
 
+void dual_sweep_down(int r, int g, int b, int wait) {
+    blank_ledcolors();
+    render_leds();
+    for (int i = LEDCOUNT/2; i >= 0; i--) {
+        fade_in_two(LEDCOUNT - i, i, 0, r, g, b, wait);
+    }
+    blank_ledcolors();
+    render_leds();
+}
+
 void fade_in_two(int ledleft, int ledright, int up, int r, int g, int b, int wait) {
     // multiply by 100 for finer resolution without floats
     r = r * 100;
@@ -341,6 +359,100 @@ void fade_in_two(int ledleft, int ledright, int up, int r, int g, int b, int wai
         leds.setPixelColor(oldledright, leds.Color(0,0,0)); 
     } 
     leds.show();
+}
+
+void fan() {
+    int led1[3] = {0,4,8};
+    int led2[3] = {1,5,9};
+    int led3[3] = {2,6,10};
+    int led4[3] = {3,7,11};
+    int r = 50;
+    int g = 50;
+    int b = 10;
+    int wait = 400;
+
+    fade_in(led1, 3, r, g, b, wait);
+    fade_in(led2, 3, r, g, b, wait);
+    fade_out(led1, 3, r, g, b, wait);
+    fade_in(led3, 3, r, g, b, wait);
+    fade_out(led2, 3, r, g, b, wait);
+    fade_in(led4, 3, r, g, b, wait);
+    fade_out(led3, 3, r, g, b, wait);
+    fade_in(led1, 3, r, g, b, wait);
+    fade_out(led4, 3, r, g, b, wait);
+    fade_in(led2, 3, r, g, b, wait);
+    fade_out(led1, 3, r, g, b, wait);
+    fade_in(led3, 3, r, g, b, wait);
+    fade_out(led2, 3, r, g, b, wait);
+    fade_in(led4, 3, r, g, b, wait);
+    fade_out(led3, 3, r, g, b, wait);
+    fade_out(led4, 3, r, g, b, wait);
+
+    blank_ledcolors();
+    render_leds(); 
+}
+
+void fade_out(int * led, int size, int r, int g, int b, int wait) {
+    // multiply by 100 for finer resolution without floats
+    r = r * 100;
+    g = g * 100;
+    b = b * 100;
+    
+    // save starting values
+    int rstart = r;
+    int gstart = g;
+    int bstart = b;
+    
+    // divide by 255 to get increments
+    int rinc = rstart / 128;
+    int ginc = gstart / 128;
+    int binc = bstart / 255;
+    
+    for (int i = 255; i > 0; i -= 2) {
+        for (int j = 0; j < size; j++) {
+            leds.setPixelColor(led[j], leds.Color(r/100, g/100, b/100));
+        }  
+        leds.show();
+        delayMicroseconds(wait);
+        r = r - rinc;
+        g = g - ginc;
+        b = b - binc;
+    }
+    for (int j = 0; j < size; j++) {
+            leds.setPixelColor(led[j], leds.Color(0,0,0));
+        }
+}
+
+void fade_in(int * led, int size, int r, int g, int b, int wait) {
+    // multiply by 100 for finer resolution without floats
+    r = r * 100;
+    g = g * 100;
+    b = b * 100;
+    
+    // save starting values
+    int rstart = r;
+    int gstart = g;
+    int bstart = b;
+    
+    // divide by 255 to get increments
+    int rinc = rstart / 128;
+    int ginc = gstart / 128;
+    int binc = bstart / 128;
+    
+    r = 0;
+    g = 0;
+    b = 0;
+    
+    for (int i = 255; i > 0; i -= 2) {
+        for (int j = 0; j < size; j++) {
+            leds.setPixelColor(led[j], leds.Color(r/100, g/100, b/100));
+        }    
+        leds.show();
+        delayMicroseconds(wait);
+        r = r + rinc;
+        g = g + ginc;
+        b = b + binc;
+    }
 }
 
 void blank_ledcolors() {

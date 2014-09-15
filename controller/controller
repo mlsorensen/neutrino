@@ -71,17 +71,22 @@ sub handle_settings {
     if ($state eq "heat") {
         #do_heating($config);
         $hub->heat();
+        $hub->animate_leds({"name"=>"dual_sweep_up", color =>[90,20,0]});
     } elsif ($state eq "heat+humidify") {
         #do_heating_and_humidifying($config);
         $hub->heat_and_humidify();
+        $hub->animate_leds({"name"=>"dual_sweep_up", color =>[90,0,10]});
     } elsif ($state eq "humidify") {
         #do_humidifying($config);
         $hub->humidify();
+        $hub->animate_leds({"name"=>"dual_sweep_up", color =>[0,90,30]});
     } elsif ($state eq "cool") {
         #do_cooling($config);
         $hub->cool();
+        $hub->animate_leds({"name"=>"dual_sweep_down", color =>[00,20,90]});
     } elsif ($state eq "fan") {
         $hub->fan();
+        $hub->animate_leds({"name"=>"fan"});
     }else {
         #do_idle($config);
         $hub->idle();
