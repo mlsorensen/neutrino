@@ -3,12 +3,12 @@
 #include <JsonGenerator.h>
 #include <Adafruit_NeoPixel.h>
 
-#define HEAT_PIN     2
-#define COOL_PIN     3
-#define FAN_PIN      4
-#define HUMIDIFY_PIN 5
-#define HEAT2_PIN    9
-#define COOL2_PIN    10
+#define HEAT_PIN     9
+#define COOL_PIN     10
+#define FAN_PIN      2
+#define HUMIDIFY_PIN 3
+#define HEAT2_PIN    4
+#define COOL2_PIN    5
 
 #define LEDPIN       6
 #define LEDCOUNT     12
@@ -22,6 +22,10 @@ bool update_relays();
 void render_leds();
 void blank_ledcolors();
 bool is_idle();
+void animate(const char * animation, int color[3]);
+void smiley_face();
+void dual_sweep_up(int r, int g, int b, int wait);
+void fade_in_two(int ledleft, int ledright, int up, int r, int g, int b, int wait);
 
 struct Relaystates {
     bool heat     = 0;
@@ -164,7 +168,13 @@ void loop() {
         } else if (strcmp(incoming["msgtype"],"renderleds") == 0) {
             render_leds();
             ack(1, (const char*)"rendered leds");
-        } else {
+        } else if (strcmp(incoming["msgtype"],"animation") == 0) {
+            int color[] = {atoi((char*)incoming["color"][0]),
+                           atoi((char*)incoming["color"][1]),
+                           atoi((char*)incoming["color"][2])};
+            animate((const char*)incoming["name"],color);
+            ack(1, "ran animation");
+        }else {
             ack(0, (const char*)"got unknown msgtype");
         }
         delete[] cstr;
@@ -173,6 +183,164 @@ void loop() {
 
 bool is_idle() {
     return relaystates.heat == 0 && relaystates.cool == 0 && relaystates.fan == 0 && relaystates.humidify == 0 && relaystates.heat2 == 0 && relaystates.cool2 == 0;
+}
+
+void animate(const char * animation, int color[3]) {
+    if (strcmp(animation,"smiley_face") == 0) {
+        smiley_face();
+    } else if (strcmp(animation, "dual_sweep_up") == 0) {
+        dual_sweep_up(color[0], color[1], color[2], 1000);
+    }
+}
+
+void smiley_face() {
+    blank_ledcolors();
+    int lit_leds1[] = {5,7};
+    for (int i = 0; i < sizeof(lit_leds1)/sizeof(int); i++) {
+        ledcolors[lit_leds1[i]][1] = 100;    
+        for (int j=0; j < 3; j++) {
+            ledcolors[lit_leds1[i]][j] = 100;
+        }
+    }
+    render_leds();
+    delay(1000);
+    int lit_leds2[] = {0,5,7};
+    for (int i = 0; i < sizeof(lit_leds2)/sizeof(int); i++) {
+        ledcolors[lit_leds2[i]][1] = 100;
+        for (int j=0; j < 3; j++) {
+            ledcolors[lit_leds2[i]][j] = 100;
+        }
+    }
+    render_leds();
+    delay(100);
+    int lit_leds3[] = {0,1,5,7,11};
+    for (int i = 0; i < sizeof(lit_leds3)/sizeof(int); i++) {
+        ledcolors[lit_leds3[i]][1] = 100;
+        for (int j=0; j < 3; j++) {
+            ledcolors[lit_leds3[i]][j] = 100;
+        }
+    }
+    render_leds();
+    delay(100);
+    int lit_leds4[] = {0,1,2,5,7,10,11};
+    for (int i = 0; i < sizeof(lit_leds4)/sizeof(int); i++) {
+        ledcolors[lit_leds4[i]][1] = 100;
+        for (int j=0; j < 3; j++) {
+            ledcolors[lit_leds4[i]][j] = 100;
+        }
+    }
+    render_leds();
+    delay(1000);
+    blank_ledcolors();
+    int lit_leds5[5] = {0,1,2,10,11};
+    for (int i = 0; i < sizeof(lit_leds5)/sizeof(int); i++) {
+        ledcolors[lit_leds5[i]][1] = 100;
+        for (int j=0; j < 3; j++) {
+            ledcolors[lit_leds5[i]][j] = 100;
+        }
+    }
+    render_leds();
+    delay(200);
+    for (int i = 0; i < sizeof(lit_leds4)/sizeof(int); i++) {
+        ledcolors[lit_leds4[i]][1] = 100;
+        for (int j=0; j < 3; j++) {
+            ledcolors[lit_leds4[i]][j] = 100;
+        }
+    }
+    render_leds();
+    delay(400);
+    blank_ledcolors();
+    for (int i = 0; i < sizeof(lit_leds5)/sizeof(int); i++) {
+        ledcolors[lit_leds5[i]][1] = 100;
+        for (int j=0; j < 3; j++) {
+            ledcolors[lit_leds5[i]][j] = 100;
+        }
+    }
+    render_leds();
+    delay(200);
+    for (int i = 0; i < sizeof(lit_leds4)/sizeof(int); i++) {
+        ledcolors[lit_leds4[i]][1] = 100;
+        for (int j=0; j < 3; j++) {
+            ledcolors[lit_leds4[i]][j] = 100;
+        }
+    }
+    render_leds();
+}
+
+void dual_sweep_up(int r, int g, int b, int wait) {
+    blank_ledcolors();
+    render_leds();
+    for (int i = 0; i <= LEDCOUNT/2; i++) {
+        fade_in_two(i, LEDCOUNT - i, 1, r, g, b, wait);
+    }
+    blank_ledcolors();
+    render_leds();
+}
+
+void fade_in_two(int ledleft, int ledright, int up, int r, int g, int b, int wait) {
+    // multiply by 100 for finer resolution without floats
+    r = r * 100;
+    g = g * 100;
+    b = b * 100;
+    
+    // save starting values
+    int rstart = r;
+    int gstart = g;
+    int bstart = b;
+    
+    // divide by 255 to get increments
+    int rinc = rstart / 128;
+    int ginc = gstart / 128;
+    int binc = bstart / 128;
+    
+    r = 0;
+    g = 0;
+    b = 0;
+    
+    int rold = rstart;
+    int gold = gstart;
+    int bold = bstart;
+    
+    int oldledleft  = -1;
+    int oldledright = 13;
+    
+    if (up == 1) {
+        oldledleft  = ledleft - 1;
+        oldledright = ledright + 1;
+    } else {
+        oldledleft  = ledleft;
+        ledleft = oldledleft + 1;
+        oldledright = ledright;
+        ledright = oldledright -1;
+    }
+    
+    for (int i = 255; i > 0; i -= 2) {
+        leds.setPixelColor(ledleft, leds.Color(r/100, g/100, b/100));
+        leds.setPixelColor(ledright, leds.Color(r/100, g/100, b/100));
+        if (oldledleft >= 0) {
+           leds.setPixelColor(oldledleft, leds.Color(rold/100, gold/100, bold/100));     
+        }
+        if (oldledright <= LEDCOUNT) {
+           leds.setPixelColor(oldledright, leds.Color(rold/100, gold/100, bold/100)); 
+        }    
+        leds.show();
+        delayMicroseconds(wait);
+        r = r + rinc;
+        g = g + ginc;
+        b = b + binc;
+        rold = rold - rinc;
+        gold = gold - ginc;
+        bold = bold - binc;
+    }
+    
+    // fractions of increments sometimes mean that the leds don't get turned all the way off.
+    if (oldledleft >= 0) {
+        leds.setPixelColor(oldledleft, leds.Color(0,0,0));
+    }
+    if (oldledright <= LEDCOUNT) {
+        leds.setPixelColor(oldledright, leds.Color(0,0,0)); 
+    } 
+    leds.show();
 }
 
 void blank_ledcolors() {

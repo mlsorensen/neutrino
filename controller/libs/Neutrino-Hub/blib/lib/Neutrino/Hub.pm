@@ -93,6 +93,22 @@ sub render_leds {
     }
 }
 
+sub animate_leds {
+    my $self = shift;
+    my $params = shift;
+    #valid names: "smiley_face"
+    my $msg = to_json({"msgtype" => "animation", "name" => $params->{name}, "color" => $params->{color}});
+    
+    send_msg($self,$msg);
+    my $result = recv_msg($self);
+
+    if ($result->{result}) {
+        print("Animate led message success\n");
+    } else {
+        print("Animate led message failed: $result->{detail}\n");
+    }
+}
+
 sub heat {
     my $self = shift;
     set_relays($self, {heat => 1});
