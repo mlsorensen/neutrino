@@ -143,7 +143,7 @@ function getSensorData(sensor, hours, datatype) {
 
 function chooseColor(startcolor, id) {
     var rgb = hexToRgb(startcolor);
-    var multiplier = id * 20;
+    var multiplier = id * 50;
     return rgbToHex((rgb.r + multiplier) % 255, (rgb.g + multiplier) % 255, (rgb.b + multiplier) % 255);
 }
 
