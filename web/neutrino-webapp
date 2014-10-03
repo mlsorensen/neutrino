@@ -57,7 +57,7 @@ get "/weather" => sub {
 get "/sensors" => sub {
     my $self = shift;
     my $dbh  = _mysql_dbh($self, $config) or return;
-    my $sth  = $dbh->prepare("SELECT * from sensor");
+    my $sth  = $dbh->prepare("SELECT display_name,drives_hvac,sensor_address,sensor_group,sensor_hub_id from sensor");
     $sth->execute();
     my $data = $sth->fetchall_hashref('sensor_address');
     $sth->finish();
@@ -202,6 +202,19 @@ get "/sensorgroups" => sub {
             $sth->execute($key);
             if(!$dbh->errstr()) {
                 $data->{$key}->{members} = $sth->fetchall_hashref('sensor_address');
+            }
+            $sth->finish();
+
+            # fetch stats for group
+            my $tempcol = _tempunits($self,$config);
+            $sth = $dbh->prepare("select sensor_tie.sensorgroup_id, avg($tempcol) as temperature, avg(data.humidity) as humidity,avg(data.pascals)"
+                                 . " as pressure from data,sensor_tie where sensor_tie.sensorgroup_id=? and data.sensor_id=sensor_tie.sensor_id "
+                                 . " and date > (now() - 180) and data.pascals != 0 and humidity != 0 group by sensor_tie.sensorgroup_id;");
+            $sth->execute($key);
+            if(!$dbh->errstr()) {
+                $data->{$key}->{stats} = $sth->fetchall_hashref('sensorgroup_id')->{$key};
+            } else {
+                print STDERR "Failed to fetch sensorgroup stats for group id $key";
             }
             $sth->finish();
         }
@@ -525,6 +538,22 @@ sub _sensor_addr_to_id {
 
     my $id = ($sth->fetchrow_array())[0];
     return $id;
+}
+
+sub _tempunits {
+    my $self = shift;
+    my $config = shift;
+    my $dbh = _mysql_dbh($self, $config);
+    my $sth = $dbh->prepare("select value from configuration where name='tempunits'");
+    $sth->execute();
+    my $row = $sth->fetchrow_hashref();
+    $sth->finish();
+    $dbh->disconnect();
+    if (exists $row->{value}) {
+        return lc($row->{value});
+    } else {
+        return "Fahrenheit";
+    }
 }
 
 __DATA__

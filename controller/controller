@@ -12,6 +12,7 @@ my $version          = '0.1';
 my $state            = 'idle';
 my $opts             = {};
 my $hub              = Neutrino::Hub->new({"debug" => 1});
+my $interval         = 1;
 
 getopts('c:', $opts);
 print ("no config file provided\n") && usage() && exit(1) if (! exists $opts->{c});
@@ -35,7 +36,14 @@ while (1) {
         print ("skipping due to setpoint fetch failure\n");
     }
 
-    sleep 5;
+    # clean up data on occasion
+    if ($interval >= 100) {
+        clean_stats($config);
+        $interval = 1;
+    } else {
+        $interval++;
+   }
+   sleep 5;
 }
 
 ############
@@ -276,7 +284,10 @@ sub get_stats {
         print "unable to get temperature preference from config, not fetching stats\n";
         return undef;
     }
-    my $sth = $dbh->prepare("select avg($tempcol) as temperature, avg(data.humidity) as humidity from data,sensor_tie where sensor_tie.sensorgroup_id=? and date > (now() - 120) group by data.sensor_id;");
+    #my $sth = $dbh->prepare("select avg($tempcol) as temperature, avg(data.humidity) as humidity from data,sensor_tie where sensor_tie.sensorgroup_id=? and date > (now() - 180) group by data.sensor_id;");
+    my $sth = $dbh->prepare("select sensor_tie.sensorgroup_id, avg($tempcol) as temperature, avg(data.humidity) as humidity,avg(data.pascals)"
+                                 . " as pressure from data,sensor_tie where sensor_tie.sensorgroup_id=? and data.sensor_id=sensor_tie.sensor_id "
+                                 . " and date > (now() - 180) and data.pascals != 0 and humidity != 0 group by sensor_tie.sensorgroup_id;");
     $sth->execute($config->{sensorgroupid});
     my $row = $sth->fetchrow_hashref();
     $sth->finish();
@@ -286,6 +297,14 @@ sub get_stats {
         return undef;
     }
     return $row;
+}
+
+sub clean_stats {
+    my $config = shift;
+    my $dbh = _mysql_dbh($config);
+    $dbh->do("delete from neutrino.data where date < now() - interval 1 week");
+    print ("cleaning up old sensor data\n");
+    $dbh->disconnect();
 }
 
 sub get_sensors {

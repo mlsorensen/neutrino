@@ -70,6 +70,8 @@ $(document).ready(function(){
         "</div>" +
     "</div>"
     });
+
+    $("a#comfort-home").trigger("click");
 });
 
 function getConfig() {

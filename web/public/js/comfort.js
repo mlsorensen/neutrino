@@ -42,7 +42,18 @@ $(document).on('DOMNodeInserted', function(event) {
     // control intervals for periodic updates
     var weatherinterval = -1;
 
+
+    // home screen
     if (event.target.id == 'comfort-home-div') {
+        //sensor nav
+        var sensorhomeinterval = setInterval(function() {
+            if (sensorgroups == undefined) {
+                return;
+            }
+            clearInterval(sensorhomeinterval);
+            populateSensorHomeNav();
+        }, 200);
+
         // populate weather
         var interval = setInterval(function() {
             if (config.location.value == undefined) {
@@ -53,6 +64,7 @@ $(document).on('DOMNodeInserted', function(event) {
             getWeather();
             weatherinterval = setInterval(function(){ populateWeather(); getWeather(); }, 300000);
         }, 200);
+
         // don't refresh if we click away
         $("#comfort-home-div").on('remove', function () {
             clearInterval(weatherinterval);
