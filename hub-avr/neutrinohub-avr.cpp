@@ -62,6 +62,11 @@ void setup() {
     leds.begin();
     blank_ledcolors();
     render_leds();
+
+    // startup animation
+    int color[] = {0, 20, 90};
+    animate("dual_sweep_up",color);
+    animate("dual_sweep_down",color);
 }
 
 void loop() {

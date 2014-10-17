@@ -6,11 +6,11 @@ my $h = new Neutrino::Hub({"debug" => 1});
 #$h->test_msg();
 #$h->reset();
 #sleep 2;
-#$h->cool();
-#$h->cool();
-#$h->humidify();
-#sleep 3;
-#$h->idle();
+$h->cool();
+sleep 2;
+$h->humidify();
+sleep 2;
+$h->idle();
 #$h->clear_relays();
 #sleep 2;
 #$h->set_relays({cool=>1});
@@ -25,6 +25,7 @@ $h->animate_leds({name => "dual_sweep_up", color => [0,90,30]});#humidify
 $h->animate_leds({name => "dual_sweep_up", color => [90,0,10]});#heat+humidify
 $h->animate_leds({name => "fan"});#fan
 $h->animate_leds({name => "smiley_face"});#smile!
+$h->animate_leds({name => "dual_sweep_up", color => [90,20,0]});#heat
 #foreach my $color(0..255) {
 #    $color = 255 - $color;
 #    next unless $color % 2 == 0;
