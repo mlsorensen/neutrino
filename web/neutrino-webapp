@@ -57,14 +57,49 @@ get "/weather" => sub {
 get "/sensors" => sub {
     my $self = shift;
     my $dbh  = _mysql_dbh($self, $config) or return;
-    my $sth  = $dbh->prepare("SELECT * from sensor");
+    my $sth  = $dbh->prepare("SELECT display_name,drives_hvac,sensor_address,sensor_group,sensor_hub_id from sensor");
     $sth->execute();
-    my $data = $sth->fetchall_hashref('id');
+    my $data = $sth->fetchall_hashref('sensor_address');
     $sth->finish();
     if (!$dbh->errstr()) {
         $self->render(status => 200, json => { result => 1, payload => $data});
     } else {
         $self->render(status => 500, json => { result => 0, payload => 'Database error occurred'});
+    }
+};
+
+del "/sensors/:address" => sub {
+    my $self       = shift;
+    my $address    = $self->param('address');
+    my $validator  = Mojolicious::Validator->new;
+    my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
+
+    $validation->input({'address' => $address});
+    $validation->required('address')->like(qr/^\d+$/);
+
+    if (! $validation->is_valid('address')) {
+        $self->render(status => 406, json => { result => 0, text => "data provided did not match character validation"} );
+        return;
+    }
+
+    # get sensor id
+    my $sensorid = _sensor_addr_to_id($self, $config, $address);
+    if ($sensorid eq undef or $sensorid < 0) {
+        $self->render(status => 500, json => { result => 0, text => "unable to find sensor id by address"});
+        return;
+    }
+
+    my $dbh = _mysql_dbh($self, $config) or return;
+    $dbh->do("delete from data where sensor_id=?", undef, $sensorid);
+    if ($dbh->errstr()){
+        $self->render(status => 500, json => { result => 0, text => 'failed to delete from database:' . $dbh->errstr()});
+    } else {
+        $dbh->do("delete from sensor where sensor_address=?", undef, $address);
+        if($dbh->errstr()) {
+            $self->render(status => 500, json => { result => 0, text => 'failed to delete from database:' . $dbh->errstr()});
+        } else {
+            $self->render(status => 200, json => { result => 1, text => 'success' });
+        }
     }
 };
 
@@ -98,7 +133,7 @@ post "/controllers/:id/sensorgroup" => sub {
     $validation->input({'id' => $id, 'group' => $group});
     $validation->required('id')->like(qr/^\d+$/);
     $validation->required('group')->like(qr/^\d+$/);
-    if(! $validation->is_valid) {
+    if(! $validation->is_valid('id') || ! $validation->is_valid('group')) {
         $self->render(status => 406, json => { result => 0, text => "data provided did not match character validation"} );
         return;
     }
@@ -129,19 +164,24 @@ post "/controllers/:id/:setting" => sub {
     my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
 
     $validation->input({'id' => $id, 'setting' => $setting, 'value' => $value});
+    $validation->required('setting')->in(qw|heat cool humidify enabled fan_mode|);
     $validation->required('id')->like(qr/^\d+$/);
-    $validation->required('setting')->in('setpoint','enabled','fan_mode','tolerance');
-    $validation->required('value')->like(qr/^(\d+|auto|on)$/);
-    if(! $validation->is_valid) {
+    $validation->required('value')->like(qr/^(\d+|auto|on|off)$/);
+    
+    if(! $validation->is_valid('id') || ! $validation->is_valid('setting') || ! $validation->is_valid('value')) {
         $self->render(status => 406, json => { result => 0, text => "data provided did not match character validation"} );
         return;
     }
 
     my $dbh  = _mysql_dbh($self, $config) or return;
 
-    $dbh->do("UPDATE controller SET $setting=? WHERE id=?",undef, $value, $id);
+    if ($setting eq 'fan_mode' or $setting eq 'enabled') {
+        $dbh->do("UPDATE controller SET $setting=? WHERE id=?",undef, $value, $id);
+    } else {
+        $dbh->do("UPDATE controller_capabilities SET setpoint=? WHERE controller_id=? AND capability=?", undef, $value, $id, $setting);
+    }
     if (!$dbh->errstr()) {
-        $self->render(status => 200, json => { result => 1, text => 'success'});
+        $self->render(status => 200, json => { result => 0, text => 'success'});
     } else {
         $self->render(status => 500, json => { result => 0, text => 'Failed to update controller:' . $dbh->errstr()});
     }
@@ -161,7 +201,20 @@ get "/sensorgroups" => sub {
                                     "from sensor,sensor_tie where sensor_tie.sensor_id = sensor.id and sensor_tie.sensorgroup_id=?");
             $sth->execute($key);
             if(!$dbh->errstr()) {
-                $data->{$key}->{members} = $sth->fetchall_hashref('id');
+                $data->{$key}->{members} = $sth->fetchall_hashref('sensor_address');
+            }
+            $sth->finish();
+
+            # fetch stats for group
+            my $tempcol = _tempunits($self,$config);
+            $sth = $dbh->prepare("select sensor_tie.sensorgroup_id, avg($tempcol) as temperature, avg(data.humidity) as humidity,avg(data.pascals)"
+                                 . " as pressure from data,sensor_tie where sensor_tie.sensorgroup_id=? and data.sensor_id=sensor_tie.sensor_id "
+                                 . " and date > (now() - 180) and data.pascals != 0 and humidity != 0 group by sensor_tie.sensorgroup_id;");
+            $sth->execute($key);
+            if(!$dbh->errstr()) {
+                $data->{$key}->{stats} = $sth->fetchall_hashref('sensorgroup_id')->{$key};
+            } else {
+                print STDERR "Failed to fetch sensorgroup stats for group id $key";
             }
             $sth->finish();
         }
@@ -179,7 +232,7 @@ put "/sensorgroups" => sub {
 
     $validation->input({'name' => $name});
     $validation->required('name')->like(qr/^[\s\w\d,\-\._\']+$/);;
-    if(! $validation->is_valid) {
+    if(! $validation->is_valid('name')) {
         $self->render(status => 406, json => { result => 0, text => "name provided did not match character validation"} );
         return;
     }
@@ -201,7 +254,7 @@ del "/sensorgroups/:id" => sub {
 
     $validation->input({'id' => $id});
     $validation->required('id')->like(qr/^\d+$/);;
-    if(! $validation->is_valid) {
+    if(! $validation->is_valid('id')) {
         $self->render(status => 406, json => { result => 0, text => "id provided did not match character validation"} );
         return;
     }
@@ -229,7 +282,7 @@ post "/sensorgroups/:id/name" => sub {
     $validation->input({'id' => $id, 'name' => $name});
     $validation->required('id')->like(qr/^\d+$/);
     $validation->required('name')->like(qr/^[\s\w\d,\-\._\']+$/);
-    if(! $validation->is_valid) {
+    if(! $validation->is_valid('id') || ! $validation->is_valid('name')) {
         $self->render(status => 406, json => { result => 0, text => "id or value provided did not match character validation"} );
         return;
     }
@@ -250,7 +303,7 @@ get "/sensorgroups/:id/sensors" => sub {
 
     $validation->input({'id' => $id});
     $validation->required('id')->like(qr/^\d+$/);
-    if(! $validation->is_valid) {
+    if(! $validation->is_valid('id')) {
         $self->render(status => 406, json => { result => 0, text => "id or value provided did not match character validation"} );
         return;
     }
@@ -267,18 +320,25 @@ get "/sensorgroups/:id/sensors" => sub {
     }
 };
 
-put "/sensorgroups/:id/sensors/:value" => sub {
-    my $self       = shift;
-    my $id         = $self->param('id');
-    my $sensorid   = $self->param('value');
-    my $validator  = Mojolicious::Validator->new;
-    my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
+put "/sensorgroups/:id/sensors/:sensoraddress" => sub {
+    my $self            = shift;
+    my $id              = $self->param('id');
+    my $sensoraddress   = $self->param('sensoraddress');
+    my $validator       = Mojolicious::Validator->new;
+    my $validation      = Mojolicious::Validator::Validation->new(validator => $validator);
 
-    $validation->input({'id' => $id, 'sensorid' => $sensorid});
+    $validation->input({'id' => $id, 'sensoraddress' => $sensoraddress});
     $validation->required('id')->like(qr/^\d+$/);
-    $validation->required('sensorid')->like(qr/^\d+$/);
-    if(! $validation->is_valid) {
-        $self->render(status => 406, json => { result => 0, text => "id or value provided did not match character validation"} );
+    $validation->required('sensoraddress')->like(qr/^\d+$/);
+    if(! $validation->is_valid('id') || ! $validation->is_valid('sensoraddress')) {
+        $self->render(status => 406, json => { result => 0, text => "id or sensoraddress provided did not match character validation"} );
+        return;
+    }
+
+    # get sensor id
+    my $sensorid = _sensor_addr_to_id($self, $config, $sensoraddress);
+    if ($sensorid eq undef or $sensorid < 0) {
+        $self->render(status => 500, json => { result => 0, text => "unable to find sensor id by address"});
         return;
     }
 
@@ -299,18 +359,25 @@ put "/sensorgroups/:id/sensors/:value" => sub {
     }
 };
 
-del "/sensorgroups/:id/sensors/:value" => sub {
-    my $self       = shift;
-    my $id         = $self->param('id');
-    my $sensorid   = $self->param('value');
-    my $validator  = Mojolicious::Validator->new;
-    my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
+del "/sensorgroups/:id/sensors/:address" => sub {
+    my $self            = shift;
+    my $id              = $self->param('id');
+    my $sensoraddress   = $self->param('address');
+    my $validator       = Mojolicious::Validator->new;
+    my $validation      = Mojolicious::Validator::Validation->new(validator => $validator);
 
-    $validation->input({'id' => $id, 'sensorid' => $sensorid});
+    $validation->input({'id' => $id, 'sensoraddress' => $sensoraddress});
     $validation->required('id')->like(qr/^\d+$/);
-    $validation->required('sensorid')->like(qr/^\d+$/);
-    if(! $validation->is_valid) {
-        $self->render(status => 406, json => { result => 0, text => "id or value provided did not match character validation"} );
+    $validation->required('sensoraddress')->like(qr/^\d+$/);
+    if(! $validation->is_valid('id') || ! $validation->is_valid('sensoraddress')) {
+        $self->render(status => 406, json => { result => 0, text => "id or value sensoraddress did not match character validation"} );
+        return;
+    }
+
+     # get sensor id
+    my $sensorid = _sensor_addr_to_id($self, $config, $sensoraddress);
+    if ($sensorid eq undef or $sensorid < 0) {
+        $self->render(status => 500, json => { result => 0, text => "unable to find sensor id by address"});
         return;
     }
 
@@ -324,28 +391,28 @@ del "/sensorgroups/:id/sensors/:value" => sub {
 
 };
 
-get "/sensors/:id/data" => sub {
+get "/sensors/:address/data" => sub {
     my $self       = shift;
-    my $id         = $self->param('id');
-    my $value      = $self->param('value');
+    my $address    = $self->param('address');
+    my $value      = lc($self->param('value'));
     my $hours      = $self->param('hours');
     my $validator  = Mojolicious::Validator->new;
     my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
 
-    $validation->input({'id' => $id, 'value' => $value, 'hours' => $hours});
-    $validation->required('id')->like(qr/^\d+$/);
-    $validation->required('value')->in(qw(voltage fahrenheit celsius humidity pascals all));
+    $validation->input({'address' => $address, 'value' => $value, 'hours' => $hours});
+    $validation->required('address')->like(qr/^\d+$/);
+    $validation->required('value')->in(qw|voltage fahrenheit celsius humidity pascals all|);
     $validation->required('hours')->size(1,720);
-    if(! $validation->is_valid) {
-        $self->render(status => 406, json => { result => 0, text => "a parameter($id,$value,$hours) provided did not match character validation"} );
+    if(! $validation->is_valid('address') || ! $validation->is_valid('value') || ! $validation->is_valid('hours')) {
+        $self->render(status => 406, json => { result => 0, text => "a parameter($address,$value,$hours) provided did not match character validation"} );
         return;
     }
 
     my $dbh = _mysql_dbh($self, $config) or return;
     my $field = $value;
     $field = "voltage,pressure,humidity,temperature" if $field eq "all";
-    my $sth = $dbh->prepare("SELECT UNIX_TIMESTAMP(date) as epoch,date,id,$field from data where sensor_id=? and date >= DATE_SUB(NOW(),INTERVAL $hours HOUR)");
-    $sth->execute($id);
+    my $sth = $dbh->prepare("SELECT UNIX_TIMESTAMP(date) as epoch,date,data.id,$field from data,sensor where sensor.id=data.sensor_id and sensor.sensor_address=? and date >= DATE_SUB(NOW(),INTERVAL $hours HOUR)");
+    $sth->execute($address);
     my $data = $sth->fetchall_arrayref({});
     $sth->finish();
     if (!$dbh->errstr()) {
@@ -356,23 +423,23 @@ get "/sensors/:id/data" => sub {
     }
 };
 
-post "/sensors/:id/name" => sub {
+post "/sensors/:address/name" => sub {
     my $self       = shift;
-    my $id         = $self->param('id');
+    my $address    = $self->param('address');
     my $value      = $self->param('value');
     my $validator  = Mojolicious::Validator->new;
     my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
 
-    $validation->input({'id' => $id, 'value' => $value});
-    $validation->required('id')->like(qr/^\d+$/);
+    $validation->input({'address' => $address, 'value' => $value});
+    $validation->required('address')->like(qr/^\d+$/);
     $validation->required('value')->like(qr/^[\s\w\d,\-\._\']+$/);
-    if(! $validation->is_valid) {
-        $self->render(status => 406, json => { result => 0, text => "a parameter($id,$value) provided did not match character validation"} );
+    if(! $validation->is_valid('address') || ! $validation->is_valid('value')) {
+        $self->render(status => 406, json => { result => 0, text => "a parameter($address,$value) provided did not match character validation"} );
         return;
     }
 
     my $dbh = _mysql_dbh($self, $config) or return;
-    $dbh->do("UPDATE sensor set display_name=? where id=?", undef, $value, $id);
+    $dbh->do("UPDATE sensor set display_name=? where sensor_address=?", undef, $value, $address);
     if($dbh->errstr()) {
         $self->render(status => 500, json => { result => 0, text => 'failed to save value to database'});
     }
@@ -413,7 +480,7 @@ post "/config/:key" => sub {
 
     $validation->input({'key' => $value});
     $validation->required('key')->like(qr/^[\s\w\d,\-\._\']+$/);
-    if(! $validation->is_valid) {
+    if(! $validation->is_valid('key')) {
         $self->render(status => 406, json => { result => 0, text => "value '$value' provided did not match character validation"} );
         return;
     }
@@ -454,6 +521,39 @@ sub _mysql_dbh {
                            $config->{mysqluser},$config->{mysqlpass})
                       or $self->render(status=>500,text=>'Failed database connection') and return 0;
     return $dbh;
+}
+
+sub _sensor_addr_to_id {
+    my $self    = shift;
+    my $config  = shift;
+    my $address = shift;
+    my $dbh     = _mysql_dbh($self,$config);
+
+    my $sth = $dbh->prepare("SELECT id FROM sensor WHERE sensor_address=?");
+    $sth->execute($address);
+
+    if ($dbh->errstr()){
+       return -1;
+    }
+
+    my $id = ($sth->fetchrow_array())[0];
+    return $id;
+}
+
+sub _tempunits {
+    my $self = shift;
+    my $config = shift;
+    my $dbh = _mysql_dbh($self, $config);
+    my $sth = $dbh->prepare("select value from configuration where name='tempunits'");
+    $sth->execute();
+    my $row = $sth->fetchrow_hashref();
+    $sth->finish();
+    $dbh->disconnect();
+    if (exists $row->{value}) {
+        return lc($row->{value});
+    } else {
+        return "Fahrenheit";
+    }
 }
 
 __DATA__

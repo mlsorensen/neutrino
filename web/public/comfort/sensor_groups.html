@@ -50,15 +50,15 @@
                 </div>
             </div>
             <div style="float:right">
-                <table id="controllerbar-setpointtable" class="hidden">
+                <table id="controllerbar-mintemptable" class="hidden">
                     <tr>
-                        <td>Setpoint&nbsp:&nbsp</td>
-                        <td id="controllerbar-setpointbutton">
-                            <div id="controllerbar-setpointdropdown" class="dropdown">
+                        <td>Min temp&nbsp:&nbsp</td>
+                        <td id="controllerbar-mintempbutton">
+                            <div id="controllerbar-mintempdropdown" class="dropdown">
                                 <a class="dropdown-toggle btn btn-default" data-toggle="dropdown" href="#">
-                                    <b id="controllerbar-setpoint">x</b><b class="caret"></b>
+                                    <b id="controllerbar-mintemp">x</b><b class="caret"></b>
                                 </a>
-                                <ul id="controllerbar-setpoint-list" style="padding: 5px 10px 0;max-height:400px;overflow-y:scroll"
+                                <ul id="controllerbar-mintemp-list" style="padding: 5px 10px 0;max-height:400px;overflow-y:scroll"
                                     class="dropdown-menu dropdown-meun-form" role="menu">
                                 </ul>
                             </div>
@@ -67,15 +67,32 @@
                 </table>
             </div>
             <div style="float:right;padding-right:5px">
-                <table id="controllerbar-tolerancetable" class="hidden">
+                <table id="controllerbar-maxtemptable" class="hidden">
                     <tr>
-                        <td>Tolerance&nbsp:&nbsp</td>
-                        <td id="controllerbar-tolerancebutton">
-                            <div id="controllerbar-tolerancedropdown" class="dropdown">
+                        <td>Max Temp&nbsp:&nbsp</td>
+                        <td id="controllerbar-maxtempbutton">
+                            <div id="controllerbar-maxtempdropdown" class="dropdown">
                                 <a class="dropdown-toggle btn btn-default" data-toggle="dropdown" href="#">
-                                    <b id="controllerbar-tolerance">x</b><b class="caret"></b>
+                                    <b id="controllerbar-maxtemp">x</b><b class="caret"></b>
                                 </a>
-                                <ul id="controllerbar-tolerance-list" style="padding: 5px 10px 0;max-height:400px;overflow-y:scroll"
+                                <ul id="controllerbar-maxtemp-list" style="padding: 5px 10px 0;max-height:400px;overflow-y:scroll"
+                                    class="dropdown-menu dropdown-meun-form" role="menu">
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div style="float:right;padding-right:5px">
+                <table id="controllerbar-humiditytable" class="hidden">
+                    <tr>
+                        <td>Min Humidity&nbsp:&nbsp</td>
+                        <td id="controllerbar-humiditybutton">
+                            <div id="controllerbar-humiditydropdown" class="dropdown">
+                                <a class="dropdown-toggle btn btn-default" data-toggle="dropdown" href="#">
+                                    <b id="controllerbar-humidity">x</b><b class="caret"></b>
+                                </a>
+                                <ul id="controllerbar-humidity-list" style="padding: 5px 10px 0;max-height:400px;overflow-y:scroll"
                                     class="dropdown-menu dropdown-meun-form" role="menu">
                                 </ul>
                             </div>
@@ -102,7 +119,9 @@
             </div>
         </div>
         <div id="sensorgroup-detail-inner" class="panel-body">
-            <div id="sensorgroup-graph" style="width:600px;height:380px;"></div>
+            <div id="sensorgroup-graph-temperature" style="width:600px;height:380px;"></div>
+            <div id="sensorgroup-graph-humidity" style="width:600px;height:380px;"></div>
+            <div id="sensorgroup-graph-pressure" style="width:600px;height:380px;"></div>
         </div>
     </div>
     </div>

@@ -1,28 +1,6 @@
-///////////////////////////////
+////`///////////////////////////
 // graph api for sensor data //
 ///////////////////////////////
-
-/*
-var colors = {
-    blue  : [],
-    red   : [],
-    green : []
-};
-
-for (i=1; i <= 5; i++) {
-    var o1  = (i * 40);
-    var o3  = 200 + (i * 10)
-
-    colors.blue.push(rgbToHex(o1, 200-o1, o3));
-    colors.blue.push(rgbToHex(200-o1, o1, o3));
-
-    colors.red.push(rgbToHex(o3, 200-o1, o1));
-    colors.red.push(rgbToHex(o3, o1, 200-o1));
-    
-    colors.green.push(rgbToHex(200-o1, o3, o1));
-    colors.green.push(rgbToHex(o1, o3, 200-o1));
-}
-
 function componentToHex(c) {
     var hex = c.toString(16);
     return hex.length == 1 ? "0" + hex : hex;
@@ -30,39 +8,92 @@ function componentToHex(c) {
 
 function rgbToHex(r, g, b) {
     return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
-}*/
+}
+
+function hexToRgb(hex) {
+    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : null;
+}
 
 // this code is for testing
 $(document).ready(function(){
-    $('#button1').click(function() {
+    $('#test-button1').click(function() {
         // graph( sensorids, axes, time, graphx, graphy, divid);
         var sensorids = [1];
         var axes = ['fahrenheit','humidity'];
-        graph(sensorids, axes, 1, 400, 150, $('#graphdiv'));
+        sensorGraph(sensorids, axes, 1, 400, 150, $('#graphdiv'));
     });
 });
 
-//
+/*
+sensorids = array of sensor ids
+axes      = array of labels for axes, needs to be one of valid data types Fahrenheit, Celsius, Humidity, Voltage
+colors    = array of colors for axes, if each axis has multiple lines we should morph the selected color for that axis
+time      = integer number of hours to graph
+graphx    = graph should be x pixels wide, null inherits width from targetdiv
+graphy    = graph should be y pixels tall, null inherits height from targetdiv
+targetdiv = location to render graph
+*/
 
-function graph( sensorids, axes, time, graphx, graphy, targetdiv) {
+function sensorGraph(sensorids, axes, colors, time, graphx, graphy, targetdiv, controller) {
     var sensordata = [];
     var dataset = [];
 
+    console.log(sensorids);
     if(axes.length > 2 || axes.length <= 0) {
         // we only support two axes
         targetdiv.html("only one or two axes, please");
         return;
     }
+
+    if (graphx == null) {
+        graphx = targetdiv.width();
+    }
+
+    if (graphy == null) {
+        graphy = targetdiv.height();
+    }
     
-    for( i = 0; i < sensorids.length; i++) {
+    var tempgraph = 0;
+    for( var i = 0; i < sensorids.length; i++) {
         var sensorid = sensorids[i];
-        for ( j = 0; j < axes.length; j++) {
-            console.log("fetching data " + axes[j]+ " for sensor" + sensorid);
-            dataset.push({data: getSensorData(sensorid, time, axes[j]), 
-                          label: axes[j], 
+        console.log("processing sensor " + sensorid);
+        for ( var j = 0; j < axes.length; j++) {
+            var axis = axes[j];
+            if (axis.toLowerCase() == 'fahrenheit' || axis.toLowerCase() == 'celsius') {
+                tempgraph = 1;
+            }
+            console.log("fetching data " + axis + " for sensor" + sensorid);
+            dataset.push({data: getSensorData(sensorid, time, axis.toLowerCase()), 
+                          label: sensors[sensorid].display_name,
+                          color: chooseColor(colors[j], sensorid),
                           lines: {show:true},
                           yaxis: j + 1
                          });
+        }
+        console.log("i = " + i + " sensorids.length = " + sensorids.length);
+    }
+
+    console.log("finished processing sensor data");
+
+    // add control bars if necessary
+    if (tempgraph && controller !== undefined) {
+        console.log("temperature graph found, fetching control bars");
+        var min = [];
+        var max = [];
+        if (controller.capabilities.heat !== undefined) {
+            min[0] = [dataset[0].data[0][0], controller.capabilities.heat.setpoint];
+            min[1] = [dataset[0].data[dataset[0].data.length-1][0], controller.capabilities.heat.setpoint];
+            dataset.push({data:min, label:"mintemp", color:"blue", lines: {show:true},yaxis: 1});
+        }
+        if (controller.capabilities.cool !== undefined) {
+            max[0] = [dataset[0].data[0][0], controller.capabilities.cool.setpoint];
+            max[1] = [dataset[0].data[dataset[0].data.length-1][0], controller.capabilities.cool.setpoint];
+            dataset.push({data:max, label:"maxtemp", color:"red", lines: {show:true},yaxis: 1});
         }
     }
 
@@ -98,6 +129,8 @@ function getSensorData(sensor, hours, datatype) {
     }).responseText);
 
     if (data.result) {
+        console.log("SENSOR DATA");
+        console.log(data);
         for (i = 0; i < data.payload.length; i++) {
             var element = [];
             element[0] = data.payload[i].epoch * 1000;
@@ -107,3 +140,11 @@ function getSensorData(sensor, hours, datatype) {
     }
     return graphdata;
 }
+
+function chooseColor(startcolor, id) {
+    var rgb = hexToRgb(startcolor);
+    var multiplier = id * 50;
+    return rgbToHex((rgb.r + multiplier) % 255, (rgb.g + multiplier) % 255, (rgb.b + multiplier) % 255);
+}
+
+
