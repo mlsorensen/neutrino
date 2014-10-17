@@ -402,10 +402,6 @@ int getMyChannel() {
     pinMode(CHANNEL_PIN_2, OUTPUT);
     digitalWrite(CHANNEL_PIN_2, LOW);
 
-    for (int i = 0 ; i < result; i++) {
-        pulse(LO_BATT_LED);
-    } 
-
     // we use channels 60-75
     result += 60;
 
