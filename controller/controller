@@ -69,7 +69,9 @@ sub handle_settings {
     my $config = shift;
 
     if ($config->{settings}->{enabled} eq 'off') {
-        print ("controller disabled, doing nothing\n");
+        print ("controller disabled, ensuring everything is off\n");
+        # ensure we shut off if we were recently disabled;
+        $hub->idle();
         return;
     }
 
