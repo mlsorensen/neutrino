@@ -17,6 +17,7 @@ my $interval         = 1;
 getopts('c:', $opts);
 print ("no config file provided\n") && usage() && exit(1) if (! exists $opts->{c});
 my $config = eval(read_file($opts->{c}));
+validate_config($config);
 
 $SIG{INT}  = \&handle_exit;
 $SIG{TERM} = \&handle_exit;
@@ -49,6 +50,12 @@ while (1) {
 ############
 ### subs ###
 ############
+sub validate_config {
+    my $config = shift;
+    if ($config->{hysteresis} eq undef) {
+        $config->{hysteresis} = 1;
+    }
+}
 sub handle_exit {
     my $signal = shift;
     print ("\nexiting on signal $signal\n");
@@ -113,12 +120,12 @@ sub state_classifier {
         $newstate = "fan";
     }
 
-    # heat. If we were already heating, use setpoint + 1 as the cutoff.
+    # heat. If we were already heating, use setpoint + $hysteresis as the cutoff.
     # the idea is that given setpoint 72 deg we don't start heating at 71.99 deg and stop at 72.01, we push up to 73.
     # we might want to consider PID logic, we'd be one of the first thermostats to do so.
     if (exists $caps->{heat} && $stats->{temperature} ne "" && $caps->{heat}->{setpoint} ne undef) {
         # keep heating to setpoint + 1 if we were already heating
-        if ($state eq "heat" && $stats->{temperature} <= $caps->{heat}->{setpoint} + 1) {
+        if ($state eq "heat" && $stats->{temperature} <= $caps->{heat}->{setpoint} + $config->{hysteresis}) {
             $newstate = "heat";
         # start heating at setpoint if we weren't previously heating
         } elsif ($stats->{temperature} <= $caps->{heat}->{setpoint}) {
@@ -134,7 +141,7 @@ sub state_classifier {
     # cool, we need to block out humidify unless we want rain in the ducts. Simply overwrite humidify newstate if we need to cool.
     if (exists $caps->{cool} && $stats->{temperature} ne "" && $caps->{cool}->{setpoint} ne undef) {
         # keep cooling to setpoint -1 if we were already cooling
-        if ($state eq "cool" && $stats->{temperature} >= $caps->{cool}->{setpoint} - 1) {
+        if ($state eq "cool" && $stats->{temperature} >= $caps->{cool}->{setpoint} - $config->{hysteresis}) {
             $newstate = "cool";
         # start heating at setpoint if we weren't previously heating
         } elsif ($stats->{temperature} >= $caps->{cool}->{setpoint}) {
