@@ -141,6 +141,7 @@ sub idle {
 sub set_relays {
     my $self   = shift;
     my $relays = shift; # list of relay states in order of: heat, cool, fan, humidify, heat2, cool2
+    my $result;
 
     my $msg = to_json({
         "msgtype"     => "setrelays",
@@ -148,8 +149,8 @@ sub set_relays {
     });
     eval {
         send_msg($self, $msg);
-        my $result = recv_msg($self);
-    }
+        $result = recv_msg($self);
+    };
     warn("CAUGHT JSON DESERIALZATION ERROR: $@") if $@;
 
     if ($result->{result}) {
