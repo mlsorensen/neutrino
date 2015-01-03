@@ -9,58 +9,67 @@
     <link href="css/style.css" rel="stylesheet">
   </head>
   <body>
-    <nav class="navbar navbar-inverse" role="navigation">
-        <div class="container-fluid">
-            <div class="navbar-header">
-                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar-collapse-1">
-                    <span class="sr-only">Toggle navigation</span>
-                    <span class="icon-bar"></span>
-                    <span class="icon-bar"></span>
-                    <span class="icon-bar"></span>
-                </button>
-                <a class="navbar-brand" href="#">Neutrino</a>
-            </div>
-            <div class="collapse navbar-collapse" id="navbar-collapse-1">
-                <ul class="nav navbar-nav">
-                    <li class="dropdown">
-                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">Comfort <b class="caret"></b></a>
-                        <ul id="comfort-dropdown" class="dropdown-menu">
-                            <li><a id="comfort-home" href="#">Home</a></li>
-                            <li class="divider"></li>
-                            <li><a id="comfort-sensors" href="#">Sensors</a></li>
-                            <li class="divider"></li>
-                            <li><a id="comfort-sensor_groups" href="#">Sensor Groups</a></li>
-                        </ul>
-                    </li>
-                    <li class="dropdown">
-                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">Camera <b class="caret"></b></a>
-                        <ul id="camera-dropdown" class="dropdown-menu">
-                            <li><a id="camera-comingsoon" href="#">Coming Soon!</a></li>
-                        </ul>
-                    </li>
-                    <li class="dropdown">
-                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">Security <b class="caret"></b></a>
-                        <ul id="security-dropdown" class="dropdown-menu">
-                            <li><a id="security-comingsoon" href="#">Coming Soon!</a></li>
-                        </ul>
-                    </li>
-                </ul>
-                <ul class="nav navbar-nav navbar-right">
-                    <li class="dropdown">
-                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">Help <b class="caret"></b></a>
-                        <ul class="dropdown-menu">
-                            <li><a id="help-setup" href="#">Setup</a></li>
-                            <li class="divider"></li>
-                            <li><a id="help-about" href="#">About</a></li>
-                            <li class="divider"></li>
-                            <li><a id="help-electron14" href="http://electron14.com">electron14.com</a></li>
-                        </ul>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
+    <div id="loader"></div>
     <script type="text/x-handlebars" data-template-name="home">
+        <nav class="navbar navbar-inverse" role="navigation">
+            <div class="container-fluid">
+                <div class="navbar-header">
+                    <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar-collapse-1">
+                        <span class="sr-only">Toggle navigation</span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                    {{#each w in weather}}
+                            <a href="#" class="navbar-brand">{{w.location}}</a>
+                            <a href="#" class="navbar-brand">{{w.fahrenheit}}&deg</a>
+                            <a href="#" class="navbar-brand">{{w.humidity}}%</a>
+                            <a href="#" class="navbar-brand">{{w.description}}</a>
+                            <img class="navbar-brand navbar-img" {{bind-attr src=w.icon}}>
+                    {{/each}}
+                </div>
+                <div class="collapse navbar-collapse" id="navbar-collapse-1">
+<!--
+                    <ul class="nav navbar-nav">
+                        <li class="dropdown">
+                            <a href="#" class="dropdown-toggle" data-toggle="dropdown">Comfort <b class="caret"></b></a>
+                            <ul id="comfort-dropdown" class="dropdown-menu">
+                                <li><a id="comfort-home" href="#">Home</a></li>
+                                <li class="divider"></li>
+                                <li><a id="comfort-sensors" href="#">Sensors</a></li>
+                                <li class="divider"></li>
+                                <li><a id="comfort-sensor_groups" href="#">Sensor Groups</a></li>
+                            </ul>
+                        </li>
+                        <li class="dropdown">
+                            <a href="#" class="dropdown-toggle" data-toggle="dropdown">Camera <b class="caret"></b></a>
+                            <ul id="camera-dropdown" class="dropdown-menu">
+                                <li><a id="camera-comingsoon" href="#">Coming Soon!</a></li>
+                            </ul>
+                        </li>
+                        <li class="dropdown">
+                            <a href="#" class="dropdown-toggle" data-toggle="dropdown">Security <b class="caret"></b></a>
+                            <ul id="security-dropdown" class="dropdown-menu">
+                                <li><a id="security-comingsoon" href="#">Coming Soon!</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+//-->
+                    <ul class="nav navbar-nav navbar-right">
+                        <li class="dropdown">
+                            <a href="#" class="dropdown-toggle" data-toggle="dropdown">Help <b class="caret"></b></a>
+                            <ul class="dropdown-menu">
+                                <li><a id="help-setup" href="#">Setup</a></li>
+                                <li class="divider"></li>
+                                <li><a id="help-about" href="#">About</a></li>
+                                <li class="divider"></li>
+                                <li><a id="help-electron14" href="http://electron14.com">electron14.com</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div> 
+            </div>
+        </nav>
         <div id="accordion" class="panel-group">
             {{#each sensorgroup in sensorGroups}}
                 <div class="panel panel-default">
@@ -86,7 +95,7 @@
                                         <div class="btn-group" role="group" aria-label="..." style='margin-top:5px'>
                                             <button type="button" class="btn btn-disabled" style='width:90px'>{{cap.capability}} at:</button>
                                             <button type="button" class="btn btn-default" {{action 'changeSetpoint' cap sensorgroup.controller_id -1}}><span class="glyphicon glyphicon-chevron-left"></span></button>
-                                            <button id="setpoint-{{unbound sensorgroup.controller_id.id}}-{{unbound cap.capability}}" type="button" class="btn btn-default" disabled>{{cap.setpoint}}</button>
+                                            <button id="setpoint-{{unbound sensorgroup.controller_id.id}}-{{unbound cap.capability}}" type="button" class="btn btn-default" disabled><b>{{cap.setpoint}}</b></button>
                                             <button type="button" class="btn btn-default" {{action 'changeSetpoint' cap sensorgroup.controller_id 1}}><span class="glyphicon glyphicon-chevron-right"></span></button>
                                         </div>
                                     {{/each}}
@@ -114,10 +123,7 @@
         </div>
     </script>
 
-    <script type="text/x-handlebars" id="charts">
-        {{view App.FlotView datasetsBinding="datasets"}}
-    </script>
-
+    <script src="js/libs/spin.min.js"></script>
     <script src="js/libs/jquery-1.11.1.min.js"></script>
     <script src="js/libs/handlebars-v2.0.0.js"></script>
     <script src="js/libs/ember.min.js"></script>

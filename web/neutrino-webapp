@@ -50,7 +50,16 @@ get "/weather" => sub {
         $ua->max_redirects(0)->connect_timeout(6)->request_timeout(10);
         my $tx = $ua->get("http://api.openweathermap.org/data/2.5/weather?q=$row->{value}" => {DNT => 1});
         if (my $res = $tx->success) { 
-            $self->render(json => { result => 1, payload => $res->body}); 
+            my $weather = $res->json;
+            my $response = {};
+            $response->{id} = 1;
+            $response->{humidity} = $weather->{main}->{humidity};
+            $response->{fahrenheit} = sprintf("%.1f",$weather->{main}->{temp} * 1.8 - 459.67);
+            $response->{celsius} = sprintf("%.1f",$weather->{main}->{temp} - 273.15);
+            $response->{location} = $weather->{name};
+            $response->{description} = $weather->{weather}->[0]->{main};
+            $response->{icon} = "http://openweathermap.org/img/w/" . $weather->{weather}->[0]->{icon} . ".png";
+            $self->render(json => { weather => [$response]}); 
         } else {
             my $err = $tx->error;
             $self->render(json => { result => 0, text => 'Unable to fetch weather from openweathermap.org' }, status => $err->{code});

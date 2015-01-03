@@ -1,4 +1,19 @@
 // models
+Neutrinoapp.Weather = DS.Model.extend({
+    icon : DS.attr('string'),
+    celsius : DS.attr('number'),
+    fahrenheit : DS.attr('number'),
+    location : DS.attr('string'),
+    description : DS.attr('string'),
+    humidity : DS.attr('number'),
+    didLoad: function() {
+        var self = this;
+        setInterval(function() {
+            self.reload();
+        }, 300000);
+    }
+});
+
 Neutrinoapp.Sensor = DS.Model.extend({
     sensor_hub_id : DS.attr('number'),
     sensor_address : DS.attr('number'),

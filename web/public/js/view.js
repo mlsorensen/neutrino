@@ -2,6 +2,9 @@ Neutrinoapp.HvaccontrollerenabledView = Ember.Checkbox.extend({
     attributeBindings: ['data-toggle'],
     'data-toggle': 'toggle',
     failed: false,
+    didInsertElement: function() {
+         $("#loader").remove();
+    },
     save: function() {
         this.ctrlr.get('store').find('hvaccontroller',this.ctrlr.get('id')).then(function(thing) {
             if (!this.failed) {
