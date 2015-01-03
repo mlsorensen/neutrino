@@ -5,7 +5,6 @@ CREATE TABLE neutrino.sensor (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `sensor_address` tinyint(3) unsigned NOT NULL,
   `display_name` varchar(255) DEFAULT NULL,
-  `sensor_group` tinyint(3) unsigned DEFAULT NULL,
   `drives_hvac` tinyint(3) unsigned DEFAULT '0',
   `sensor_hub_id` tinyint(3) unsigned NOT NULL,
   `sensor_encryption_key` binary(10) DEFAULT NULL,
@@ -37,8 +36,8 @@ CREATE TABLE neutrino.configuration (
 CREATE TABLE neutrino.controller (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `display_name` varchar(255) UNIQUE NOT NULL,
-  `enabled` enum('on','off') NOT NULL DEFAULT 'off',
-  `status` enum('heat','cool','humidify','heat+humidify','fan','idle') NOT NULL DEFAULT 'idle',
+  `enabled` boolean DEFAULT false,
+  `status` enum('heating','cooling','humidifying','heating and humidifying','fan','idle') NOT NULL DEFAULT 'idle',
   `fan_mode` enum('on','auto') NOT NULL DEFAULT 'auto',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;

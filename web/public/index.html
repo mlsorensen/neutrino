@@ -1,37 +1,26 @@
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Neutrino Home UI</title>
-
-        <!-- Bootstrap -->
-        <link href="css/bootstrap.min.css" rel="stylesheet">
-
-        <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
-        <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
-        <!--[if lt IE 9]>
-            <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
-            <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
-        <![endif]-->
-    </head>
-    <body>
-        <nav class="navbar navbar-inverse" role="navigation">
-            <div class="container-fluid">
-                <!-- Brand and toggle get grouped for better mobile display -->
-                <div class="navbar-header">
-                    <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
-                        <span class="sr-only">Toggle navigation</span>
-                        <span class="icon-bar"></span>
-                        <span class="icon-bar"></span>
-                        <span class="icon-bar"></span>
-                    </button>
-                    <a class="navbar-brand" href="#">Neutrino</a>
-                </div>
-
-            <!-- Collect the nav links, forms, and other content for toggling -->
-            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Neutrino</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+  </head>
+  <body>
+    <nav class="navbar navbar-inverse" role="navigation">
+        <div class="container-fluid">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="#">Neutrino</a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar-collapse-1">
                 <ul class="nav navbar-nav">
                     <li class="dropdown">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">Comfort <b class="caret"></b></a>
@@ -68,27 +57,82 @@
                         </ul>
                     </li>
                 </ul>
-            </div><!-- /.navbar-collapse -->
-        </div><!-- /.container-fluid -->
+            </div>
+        </div>
     </nav>
+    <script type="text/x-handlebars" data-template-name="home">
+        <div id="accordion" class="panel-group">
+            {{#each sensorgroup in sensorGroups}}
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h4 class="panel-title">
+                            <a data-toggle="collapse" data-parent="#accordion" href="#collapse-sensorgroup-{{unbound sensorgroup.id}}">{{sensorgroup.display_name}}</a>
+                            <span class="label label-warning" style="font-size:.8em; width:72px; float:right; margin-left:5px;">{{sensorgroup.stats.temperature}}&deg</span>
+                            <span class="label label-info" style="font-size:.8em; width:72px; float:right; margin-left:5px;">{{sensorgroup.stats.humidity}}% <span class="glyphicon glyphicon-tint" style="font-size:.8em"></span></span>
+                            <span class="label label-primary" style="font-size:.8em; width:72px; float:right; margin-left:5px;">{{sensorgroup.stats.pressure}} Pa</span>
+                        </h4>
+                    </div>
+                    <div id="collapse-sensorgroup-{{unbound sensorgroup.id}}" class="panel-collapse collapse">
+                        <div class="panel-body">
+                            {{#if sensorgroup.controller_id}}
+                            <div class="panel panel-default">
+                                <div class="panel-heading">
+                                    <h4 class="panel-title">{{sensorgroup.controller_id.display_name}} : {{sensorgroup.controller_id.status}}</h4>
+                                </div>
+                                <div class="panel-body">
+                                    <h5>Fan mode : {{sensorgroup.controller_id.fan_mode}}</h5>
+                                    <h5><label class="checkbox-inline">{{view "hvaccontrollerenabled" ctrlr=sensorgroup.controller_id checked=sensorgroup.controller_id.enabled}}Enabled</label></h5>
+                                    {{#each cap in sensorgroup.controller_id.capabilities}}
+                                        <div class="btn-group" role="group" aria-label="..." style='margin-top:5px'>
+                                            <button type="button" class="btn btn-disabled" style='width:90px'>{{cap.capability}} at:</button>
+                                            <button type="button" class="btn btn-default" {{action 'changeSetpoint' cap sensorgroup.controller_id -1}}><span class="glyphicon glyphicon-chevron-left"></span></button>
+                                            <button id="setpoint-{{unbound sensorgroup.controller_id.id}}-{{unbound cap.capability}}" type="button" class="btn btn-default" disabled>{{cap.setpoint}}</button>
+                                            <button type="button" class="btn btn-default" {{action 'changeSetpoint' cap sensorgroup.controller_id 1}}><span class="glyphicon glyphicon-chevron-right"></span></button>
+                                        </div>
+                                    {{/each}}
+                                </div>
+                            </div>
+                            {{/if}}
+                            {{#each statstr in statStrings}}
+                            <div id="accordion-{{unbound statstr}}-stats-sensorgroup-{{unbound sensorgroup.id}}" class="panel-group">
+                                <div class="panel-heading">
+                                    <h4 class="panel-title">
+                                        <a data-toggle="collapse" data-parent="#accordion-{{unbound statstr}}-stats-sensorgroup-{{unbound sensorgroup.id}}" href="#collapse-{{unbound statstr}}-stats-sensorgroup-{{unbound sensorgroup.id}}">{{statstr}} charts</a>
+                                    </h4>
+                                </div>
+                                <div id="collapse-{{unbound statstr}}-stats-sensorgroup-{{unbound sensorgroup.id}}" class="panel-collapse collapse">
+                                    <div class="panel-body">
+                                        {{view Neutrinoapp.FlotView members=sensorgroup.members sensorstats=sensorStats stat=statstr}}
+                                    </div>
+                                </div>
+                            </div>
+                            {{/each}}
+                        </div>
+                    </div>
+                </div>
+            {{/each}}
+        </div>
+    </script>
 
-    <div id="content-box" class="container"></div>
+    <script type="text/x-handlebars" id="charts">
+        {{view App.FlotView datasetsBinding="datasets"}}
+    </script>
 
-    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/jquery-ui.min.js"></script>
-    <!-- Include all compiled plugins (below), or include individual files as needed -->
-    <script src="js/bootstrap.min.js"></script>
-    <script src="js/home.js"></script>
-    <script src="js/help.js"></script>
-    <script src="js/comfort.js"></script>
-    <script src="js/index.js"></script>
-    <script src="js/notify.js"></script>
-    <script src="js/flot/jquery.flot.js"></script>
-    <script type="text/javascript" src="/js/flot/jquery.flot.time.js"></script>
-    <script type="text/javascript" src="/js/flot/jquery.flot.spline.js"></script>
-    <script type="text/javascript" src="/js/flot/jquery.flot.axislabels.js"></script>
-    <script type="text/javascript" src="/js/flot/curvedLines.js"></script>
-    <script src="js/sensorgraph.js"></script>
+    <script src="js/libs/jquery-1.11.1.min.js"></script>
+    <script src="js/libs/handlebars-v2.0.0.js"></script>
+    <script src="js/libs/ember.min.js"></script>
+    <script src="js/libs/ember-data.min.js"></script>
+    <script src="js/libs/bootstrap.min.js"></script>    
+    <script src="js/application.js"></script>
+    <script src="js/router.js"></script>
+    <script src="js/models.js"></script>
+    <script src="js/functions.js"></script>
+    <script src="js/controller.js"></script>
+    <script src="js/view.js"></script>
+    <script src="js/libs/flot/jquery.flot.js"></script>
+    <script src="js/libs/flot/jquery.flot.time.js"></script>
+    <script src="js/libs/flot/jquery.flot.spline.js"></script>
+    <script src="js/libs/flot/jquery.flot.axislabels.js"></script>
+    <script src="js/libs/flot/curvedLines.js"></script>
   </body>
 </html>
