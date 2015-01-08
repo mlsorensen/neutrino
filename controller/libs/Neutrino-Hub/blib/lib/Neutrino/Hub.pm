@@ -141,13 +141,14 @@ sub idle {
 sub set_relays {
     my $self   = shift;
     my $relays = shift; # list of relay states in order of: heat, cool, fan, humidify, heat2, cool2
+    my $result;
 
     my $msg = to_json({
         "msgtype"     => "setrelays",
         "relaystates" => $relays
     });
     send_msg($self, $msg);
-    my $result = recv_msg($self);
+    $result = recv_msg($self);
 
     if ($result->{result}) {
         print("Set relays success\n");
@@ -175,27 +176,55 @@ sub send_msg {
     my $self = shift;
     my $msg = shift;
 
+    if ($self->{settings}->{debug}) {
+        print "DEBUG: send_msg: sending $msg\n";
+    }
+
     open(PORT, ">$self->{serial_port}");
-    flock(PORT, LOCK_EX);
-    print PORT $msg . "\r\n";
+    eval {
+        local $SIG{ALRM} = sub { die "DEBUG: send_msg: Failed in FLOCK of $self->{serial_port}" };
+        alarm 30;
+        flock(PORT, LOCK_EX);
+        print PORT $msg . "\r\n";
+        alarm 0;
+    };
+    print $@ if $@;
     close PORT;
 
     if ($self->{settings}->{debug}) {
-        print "DEBUG: send_msg: $msg\n";
+        print "DEBUG: send_msg: sent    $msg\n";
     }
 }
 
 sub recv_msg {
     my $self = shift;
-    open(PORT, "<$self->{serial_port}");
-    flock(PORT, LOCK_EX);
-    my $jsonmsg = <PORT>;
+
     if ($self->{settings}->{debug}) {
-        print "DEBUG: recv_msg: $jsonmsg";
+        print "DEBUG: recv_msg: receiving message\n";
     }
-    my $msg = from_json($jsonmsg);
-    #TODO: handle bad json
+
+    my $jsonmsg;
+    open(PORT, "<$self->{serial_port}");
+    eval {
+        local $SIG{ALRM} = sub { die "DEBUG: recv_msg: Failed in FLOCK of $self->{serial_port}" };
+        alarm 30;
+        flock(PORT, LOCK_EX);
+        $jsonmsg = <PORT>;
+        alarm 0;
+    };
+    print $@ if $@;
     close PORT;
+    if ($self->{settings}->{debug}) {
+        print "DEBUG: recv_msg: got $jsonmsg";
+    }
+    my $msg;
+    eval {
+        $msg = from_json($jsonmsg);
+    };
+    if ($@) {
+        warn("CAUGHT JSON DESERIALZATION ERROR: $@");
+        return;
+    }
     return $msg;
 }
 

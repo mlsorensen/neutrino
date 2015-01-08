@@ -17,6 +17,7 @@ my $interval         = 1;
 getopts('c:', $opts);
 print ("no config file provided\n") && usage() && exit(1) if (! exists $opts->{c});
 my $config = eval(read_file($opts->{c}));
+validate_config($config);
 
 $SIG{INT}  = \&handle_exit;
 $SIG{TERM} = \&handle_exit;
@@ -26,7 +27,8 @@ if (! verify_controller($config)) {
 }
 
 print ("verified controller, starting services\n");
-$hub->idle();
+do_idle($config);
+#$hub->idle();
 
 while (1) {
     if (get_settings($config)) {
@@ -49,11 +51,18 @@ while (1) {
 ############
 ### subs ###
 ############
+sub validate_config {
+    my $config = shift;
+    if ($config->{hysteresis} eq undef) {
+        $config->{hysteresis} = 1;
+    }
+}
 sub handle_exit {
     my $signal = shift;
     print ("\nexiting on signal $signal\n");
     print ("might need to wait for fan to clear excess heat/cold/humidity\n");
-    $hub->idle();
+    #$hub->idle();
+    do_idle($config);
     print ("goodbye\n");
     exit(0);
 }
@@ -61,8 +70,11 @@ sub handle_exit {
 sub handle_settings {
     my $config = shift;
 
-    if ($config->{settings}->{enabled} eq 'off') {
-        print ("controller disabled, doing nothing\n");
+    if (!$config->{settings}->{enabled}) {
+        print ("controller disabled, ensuring everything is off\n");
+        # ensure we shut off if we were recently disabled;
+        do_idle($config);
+        #$hub->idle();
         return;
     }
 
@@ -77,27 +89,28 @@ sub handle_settings {
     $state = state_classifier($stats, $config);
     
     if ($state eq "heat") {
-        #do_heating($config);
-        $hub->heat();
-        $hub->animate_leds({"name"=>"dual_sweep_up", color =>[90,20,0]});
+        do_heating($config);
+        #$hub->heat();
+        #$hub->animate_leds({"name"=>"dual_sweep_up", color =>[90,20,0]});
     } elsif ($state eq "heat+humidify") {
-        #do_heating_and_humidifying($config);
-        $hub->heat_and_humidify();
-        $hub->animate_leds({"name"=>"dual_sweep_up", color =>[90,0,10]});
+        do_heating_and_humidifying($config);
+        #$hub->heat_and_humidify();
+        #$hub->animate_leds({"name"=>"dual_sweep_up", color =>[90,0,10]});
     } elsif ($state eq "humidify") {
-        #do_humidifying($config);
-        $hub->humidify();
-        $hub->animate_leds({"name"=>"dual_sweep_up", color =>[0,90,30]});
+        do_humidifying($config);
+        #$hub->humidify();
+        #$hub->animate_leds({"name"=>"dual_sweep_up", color =>[0,90,30]});
     } elsif ($state eq "cool") {
-        #do_cooling($config);
-        $hub->cool();
-        $hub->animate_leds({"name"=>"dual_sweep_down", color =>[00,20,90]});
+        do_cooling($config);
+        #$hub->cool();
+        #$hub->animate_leds({"name"=>"dual_sweep_down", color =>[00,20,90]});
     } elsif ($state eq "fan") {
-        $hub->fan();
-        $hub->animate_leds({"name"=>"fan"});
+        do_fan($config);
+        #$hub->fan();
+        #$hub->animate_leds({"name"=>"fan"});
     }else {
-        #do_idle($config);
-        $hub->idle();
+        do_idle($config);
+        #$hub->idle();
     }
 }
 
@@ -113,12 +126,12 @@ sub state_classifier {
         $newstate = "fan";
     }
 
-    # heat. If we were already heating, use setpoint + 1 as the cutoff.
+    # heat. If we were already heating, use setpoint + $hysteresis as the cutoff.
     # the idea is that given setpoint 72 deg we don't start heating at 71.99 deg and stop at 72.01, we push up to 73.
     # we might want to consider PID logic, we'd be one of the first thermostats to do so.
     if (exists $caps->{heat} && $stats->{temperature} ne "" && $caps->{heat}->{setpoint} ne undef) {
         # keep heating to setpoint + 1 if we were already heating
-        if ($state eq "heat" && $stats->{temperature} <= $caps->{heat}->{setpoint} + 1) {
+        if ($state eq "heat" && $stats->{temperature} <= $caps->{heat}->{setpoint} + $config->{hysteresis}) {
             $newstate = "heat";
         # start heating at setpoint if we weren't previously heating
         } elsif ($stats->{temperature} <= $caps->{heat}->{setpoint}) {
@@ -134,7 +147,7 @@ sub state_classifier {
     # cool, we need to block out humidify unless we want rain in the ducts. Simply overwrite humidify newstate if we need to cool.
     if (exists $caps->{cool} && $stats->{temperature} ne "" && $caps->{cool}->{setpoint} ne undef) {
         # keep cooling to setpoint -1 if we were already cooling
-        if ($state eq "cool" && $stats->{temperature} >= $caps->{cool}->{setpoint} - 1) {
+        if ($state eq "cool" && $stats->{temperature} >= $caps->{cool}->{setpoint} - $config->{hysteresis}) {
             $newstate = "cool";
         # start heating at setpoint if we weren't previously heating
         } elsif ($stats->{temperature} >= $caps->{cool}->{setpoint}) {
@@ -148,60 +161,44 @@ sub state_classifier {
 }
 
 sub do_cooling {
-#    my $config = shift;
-#    foreach my $gpio(keys %{$config->{gpio}}) {
-#        gpio_off($config->{gpio}->{$gpio}) unless $gpio eq 'cool' or $gpio eq 'fan';
-#    }
-#    gpio_on($config->{gpio}->{fan});
-#    gpio_on($config->{gpio}->{cool});
-#    
+    my $config = shift;
+    $hub->cool();
+    $hub->animate_leds({"name"=>"dual_sweep_down", color =>[00,20,90]});
+    set_controller_status($config,"cooling");
 }
 
 sub do_heating {
-#    my $config = shift;
-#    foreach my $gpio(keys %{$config->{gpio}}) {
-#        gpio_off($config->{gpio}->{$gpio}) unless $gpio eq 'heat' or $gpio eq 'fan';
-#    }
-#    gpio_on($config->{gpio}->{fan});
-#    gpio_on($config->{gpio}->{heat});
+    my $config = shift;
+    $hub->heat();
+    $hub->animate_leds({"name"=>"dual_sweep_up", color =>[90,20,0]});
+    set_controller_status($config,"heating");
 }
 
 sub do_humidifying {
-#   foreach my $gpio(keys %{$config->{gpio}}) {
-#        gpio_off($config->{gpio}->{$gpio}) unless $gpio eq 'humidify' or $gpio eq 'fan';
-#    }
-#    gpio_on($config->{gpio}->{fan});
-#    gpio_on($config->{gpio}->{humidify});
+    my $config = shift;
+    $hub->humidify();
+    $hub->animate_leds({"name"=>"dual_sweep_up", color =>[0,90,30]});
+    set_controller_status($config,"humidifying");
 }
 
 sub do_heating_and_humidifying {
-#    foreach my $gpio(keys %{$config->{gpio}}) {
-#        gpio_off($config->{gpio}->{$gpio}) unless $gpio eq 'heat' or $gpio eq 'fan' or $gpio eq 'humidify';
-#    }
-#    gpio_on($config->{gpio}->{fan});
-#    gpio_on($config->{gpio}->{heat});
-#    gpio_on($config->{gpio}->{humidify});
+    my $config = shift;
+    $hub->heat_and_humidify();
+    $hub->animate_leds({"name"=>"dual_sweep_up", color =>[90,0,10]});
+    set_controller_status($config,"heating and humidifying");
 }
 
 sub do_fan {
-#    my $config = shift;
-#    foreach my $gpio(keys %{$config->{gpio}}) {
-#        gpio_off($config->{gpio}->{$gpio}) unless $gpio eq 'fan';
-#    }
-#    gpio_on($config->{gpio}->{fan});
+    my $config = shift;
+    $hub->fan();
+    $hub->animate_leds({"name"=>"fan"});
+    set_controller_status($config,"fan");
 }
 
 sub do_idle {
-#    my $config = shift;
-#    foreach my $gpio(keys %{$config->{gpio}}) {
-#        next unless gpio_status($config->{gpio}->{$gpio});
-#        if ($gpio eq 'fan') {
-#            gpio_off_delay($config->{gpio}->{$gpio});
-#        } else {
-#            gpio_off($config->{gpio}->{$gpio});
-#        }
-#    }
-#    $state = "idle";
+    my $config = shift;
+    $hub->idle();
+    set_controller_status($config,"idle");
 }
 
 #sub gpio_status {
@@ -419,6 +416,17 @@ sub get_controller_id {
         return 1;
     }
     return 0;
+}
+
+sub set_controller_status {
+    my $config = shift;
+    my $status = shift;
+    my $dbh = _mysql_dbh($config) or return;
+    $dbh->do("update controller set status=? where id=?", undef, $status, $config->{id});
+    if ($dbh->errstr()) {
+        warn "unable to update controller state, is mysql running?";
+    }
+    $dbh->disconnect();
 }
 
 sub usage {

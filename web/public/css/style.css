@@ -1,0 +1,16 @@
+.chart {
+    width: 320px;
+    height: 240px;
+}
+
+.navbar-brand {
+    font-size:.9em;
+    padding:12px;
+}
+
+.navbar-img {
+    padding:0px;
+}
+
+.navbar-toggle {
+}

@@ -26,6 +26,12 @@ get "/help-about.html" => {appname => $appname, version => $version} => sub {
 
 under '/api';
 
+get "/datapoints" => sub {
+    my $self = shift;
+    my $arr = [{'id'=> 1,'label'=> 'a','value'=> 30},{'id'=> 2,'label'=> 'b','value'=> 50}];
+    $self->render(json => {datapoints => $arr});
+};
+
 get "/date" => sub {
     my $self = shift;
     my $date;
@@ -44,7 +50,16 @@ get "/weather" => sub {
         $ua->max_redirects(0)->connect_timeout(6)->request_timeout(10);
         my $tx = $ua->get("http://api.openweathermap.org/data/2.5/weather?q=$row->{value}" => {DNT => 1});
         if (my $res = $tx->success) { 
-            $self->render(json => { result => 1, payload => $res->body}); 
+            my $weather = $res->json;
+            my $response = {};
+            $response->{id} = 1;
+            $response->{humidity} = $weather->{main}->{humidity};
+            $response->{fahrenheit} = sprintf("%.1f",$weather->{main}->{temp} * 1.8 - 459.67);
+            $response->{celsius} = sprintf("%.1f",$weather->{main}->{temp} - 273.15);
+            $response->{location} = $weather->{name};
+            $response->{description} = $weather->{weather}->[0]->{main};
+            $response->{icon} = "http://openweathermap.org/img/w/" . $weather->{weather}->[0]->{icon} . ".png";
+            $self->render(json => { weather => [$response]}); 
         } else {
             my $err = $tx->error;
             $self->render(json => { result => 0, text => 'Unable to fetch weather from openweathermap.org' }, status => $err->{code});
@@ -57,12 +72,12 @@ get "/weather" => sub {
 get "/sensors" => sub {
     my $self = shift;
     my $dbh  = _mysql_dbh($self, $config) or return;
-    my $sth  = $dbh->prepare("SELECT display_name,drives_hvac,sensor_address,sensor_group,sensor_hub_id from sensor");
+    my $sth  = $dbh->prepare("SELECT id,id as stats,display_name,drives_hvac,sensor_address,sensor_hub_id from sensor");
     $sth->execute();
-    my $data = $sth->fetchall_hashref('sensor_address');
+    my $data = $sth->fetchall_arrayref({});
     $sth->finish();
     if (!$dbh->errstr()) {
-        $self->render(status => 200, json => { result => 1, payload => $data});
+        $self->render(status => 200, json => { sensors => $data });
     } else {
         $self->render(status => 500, json => { result => 0, payload => 'Database error occurred'});
     }
@@ -101,6 +116,86 @@ del "/sensors/:address" => sub {
             $self->render(status => 200, json => { result => 1, text => 'success' });
         }
     }
+};
+
+get "/hvaccontrollers" => sub {
+    my $self = shift;
+    my $dbh  = _mysql_dbh($self, $config) or return;
+    my $sth  = $dbh->prepare("SELECT * from controller");
+    $sth->execute();
+    my $data = $sth->fetchall_arrayref({});
+    $sth->finish();
+    foreach my $ctrlr (@{$data}) {
+        my $sth  = $dbh->prepare("SELECT capability,setpoint from controller_capabilities where controller_id=?");
+        $sth->execute($ctrlr->{id});
+        $ctrlr->{capabilities} = $sth->fetchall_arrayref({});
+        $sth->finish();
+    }
+    if (!$dbh->errstr()) {
+        $self->render(status => 200, json => { hvaccontrollers => $data});
+    } else {
+        $self->render(status => 500, json => { result => 0, payload => 'Database error occurred:' . $dbh->errstr()});
+    }
+};
+
+get "/hvaccontrollers/:id" => sub {
+    my $self = shift;
+    my $id = $self->param('id');
+    my $validator  = Mojolicious::Validator->new;
+    my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
+
+    $validation->input({'id' => $id});
+    $validation->required('id')->like(qr/^\d+$/);
+
+    my $dbh  = _mysql_dbh($self, $config) or return;
+    my $sth  = $dbh->prepare("SELECT * from controller where id=?");
+    $sth->execute($id);
+    my $data = $sth->fetchall_arrayref({});
+    $sth->finish();
+    foreach my $ctrlr (@{$data}) {
+        my $sth  = $dbh->prepare("SELECT capability,setpoint from controller_capabilities where controller_id=?");
+        $sth->execute($ctrlr->{id});
+        $ctrlr->{capabilities} = $sth->fetchall_arrayref({});
+        $sth->finish();
+    }
+    if (!$dbh->errstr()) {
+        $self->render(status => 200, json => { hvaccontrollers => $data});
+    } else {
+        $self->render(status => 500, json => { result => 0, payload => 'Database error occurred:' . $dbh->errstr()});
+    }
+};
+
+put "/hvaccontrollers/:id" => sub {
+    my $self = shift;
+    my $id = $self->param('id');
+    my $validator  = Mojolicious::Validator->new;
+    my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
+
+    $validation->input({'id' => $id});
+    $validation->required('id')->like(qr/^\d+$/);
+
+    my $body = $self->req->json->{hvaccontroller};
+    my $dbh  = _mysql_dbh($self, $config) or return;
+
+    ## persist setpoints
+    my $caps = $body->{capabilities};
+    foreach my $cap(@{$caps}) {
+        my $sth = $dbh->prepare('UPDATE controller_capabilities set setpoint=? where capability=? and controller_id=?');
+        $sth->execute($cap->{setpoint}, $cap->{capability}, $id);
+        if($dbh->errstr()) {
+            $self->render(status => 500, json => { result => 0, payload => 'Database error occurred:' . $dbh->errstr()});
+        }
+        $sth->finish();
+    }
+
+    ## persist enable state, fanmode
+    my $sth = $dbh->prepare('UPDATE controller set fan_mode=?, enabled=?, display_name=? where id=?');
+    $sth->execute($body->{fan_mode}, $body->{enabled}, $body->{display_name}, $id);
+    if($dbh->errstr()) {
+        $self->render(status => 500, json => { result => 0, payload => 'Database error occurred:' . $dbh->errstr()});
+    }
+    
+    $self->render(status => 200, json => {});
 };
 
 get "/controllers" => sub {
@@ -187,42 +282,107 @@ post "/controllers/:id/:setting" => sub {
     }
 };
 
+#for ember
 get "/sensorgroups" => sub {
     my $self = shift;
     my $dbh  = _mysql_dbh($self, $config) or return;
     my $sth  = $dbh->prepare("SELECT * from sensorgroup");
     $sth->execute();
-    my $data = $sth->fetchall_hashref('id');
+    my $data = $sth->fetchall_arrayref({});
     $sth->finish();
     if (!$dbh->errstr()) {
+        my $statsdata = [];
         # insert group members as well
-        foreach my $key (keys %{$data}) {
-            $sth = $dbh->prepare("SELECT sensor_address,display_name,sensor_group,sensor.id,sensorgroup_id " .
-                                    "from sensor,sensor_tie where sensor_tie.sensor_id = sensor.id and sensor_tie.sensorgroup_id=?");
-            $sth->execute($key);
+        foreach my $sg (@{$data}) {
+            $sth = $dbh->prepare("SELECT sensor.id from sensor,sensor_tie where sensor_tie.sensor_id = sensor.id and sensor_tie.sensorgroup_id=?");
+            $sth->execute($sg->{id});
+            $sg->{members} = [];
             if(!$dbh->errstr()) {
-                $data->{$key}->{members} = $sth->fetchall_hashref('sensor_address');
+                $sg->{members} = [];
+                my @temp = map { $_->[0] } @{$sth->fetchall_arrayref()};
+                $sg->{members} = \@temp;
             }
             $sth->finish();
 
             # fetch stats for group
             my $tempcol = _tempunits($self,$config);
-            $sth = $dbh->prepare("select sensor_tie.sensorgroup_id, avg($tempcol) as temperature, avg(data.humidity) as humidity,avg(data.pascals)"
+            $sth = $dbh->prepare("select sensor_tie.sensorgroup_id, truncate(avg($tempcol),2) as temperature, truncate(avg(data.humidity),2) as humidity,truncate(avg(data.pascals),0)"
                                  . " as pressure from data,sensor_tie where sensor_tie.sensorgroup_id=? and data.sensor_id=sensor_tie.sensor_id "
                                  . " and date > (now() - 180) and data.pascals != 0 and humidity != 0 group by sensor_tie.sensorgroup_id;");
-            $sth->execute($key);
+            $sth->execute($sg->{id});
             if(!$dbh->errstr()) {
-                $data->{$key}->{stats} = $sth->fetchall_hashref('sensorgroup_id')->{$key};
+                my $temp = $sth->fetchall_hashref('sensorgroup_id')->{$sg->{id}};
+                #$temp->{id} = scalar @{$statsdata};
+                $temp->{id} = $sg->{id};
+                $sg->{stats} = $temp->{id};
+                push @{$statsdata}, $temp;
             } else {
-                print STDERR "Failed to fetch sensorgroup stats for group id $key";
+                print STDERR "Failed to fetch sensorgroup stats for group id $sg->{id}";
             }
             $sth->finish();
         }
-        $self->render(status => 200, json => { result => 1, payload => $data});
+        # sideload sensor data
+        my $members = [];
+        $sth = $dbh->prepare("SELECT sensor.id,sensor.display_name,sensor.drives_hvac, sensor.sensor_address, sensor.sensor_hub_id from sensor");
+        $sth->execute();
+        $members = $sth->fetchall_arrayref({});
+        $self->render(status => 200, json => { sensorgroups => $data, sensorgroupstats => $statsdata, sensors => $members});
     } else {
         $self->render(status => 500, json => { result => 0, payload => 'Database error occurred'});
     }
 };
+
+#for ember
+get "/sensorgroups/:id" => sub {
+    my $self = shift;
+    my $groupid = $self->param('id');
+
+    my $dbh  = _mysql_dbh($self, $config) or return;
+    my $sth  = $dbh->prepare("SELECT * from sensorgroup where id=?");
+    $sth->execute($groupid);
+    my $data = $sth->fetchall_arrayref({});
+    $sth->finish();
+    if (!$dbh->errstr()) {
+        my $statsdata = [];
+        # insert group members as well
+        foreach my $sg (@{$data}) {
+            $sth = $dbh->prepare("SELECT sensor.id from sensor,sensor_tie where sensor_tie.sensor_id = sensor.id and sensor_tie.sensorgroup_id=?");
+            $sth->execute($sg->{id});
+            $sg->{members} = [];
+            if(!$dbh->errstr()) {
+                $sg->{members} = [];
+                my @temp = map { $_->[0] } @{$sth->fetchall_arrayref()};
+                $sg->{members} = \@temp;
+            }
+            $sth->finish();
+
+            # fetch stats for group
+            my $tempcol = _tempunits($self,$config);
+            $sth = $dbh->prepare("select sensor_tie.sensorgroup_id, truncate(avg($tempcol),2) as temperature, truncate(avg(data.humidity),2) as humidity,truncate(avg(data.pascals),0)"
+                                 . " as pressure from data,sensor_tie where sensor_tie.sensorgroup_id=? and data.sensor_id=sensor_tie.sensor_id "
+                                 . " and date > (now() - 180) and data.pascals != 0 and humidity != 0 group by sensor_tie.sensorgroup_id;");
+            $sth->execute($sg->{id});
+            if(!$dbh->errstr()) {
+                my $temp = $sth->fetchall_hashref('sensorgroup_id')->{$sg->{id}};
+                $temp->{id} = $sg->{id};
+                $sg->{stats} = $temp->{id};
+                push @{$statsdata}, $temp;
+            } else {
+                print STDERR "Failed to fetch sensorgroup stats for group id $sg->{id}";
+            }
+            $sth->finish();
+        }
+        # sideload sensor data
+        my $members = [];
+        $sth = $dbh->prepare("SELECT sensor.id,sensor.display_name,sensor.drives_hvac, sensor.sensor_address, sensor.sensor_hub_id from sensor,sensor_tie where sensor_tie.sensor_id = sensor.id and sensor_tie.sensorgroup_id=?");
+        $sth->execute($groupid);
+        $members = $sth->fetchall_arrayref({});
+        $self->render(status => 200, json => { sensorgroups => $data, sensorgroupstats => $statsdata, sensors => $members});
+    } else {
+        $self->render(status => 500, json => { result => 0, payload => 'Database error occurred'});
+    } 
+};
+
 
 put "/sensorgroups" => sub {
     my $self       = shift;
@@ -421,6 +581,62 @@ get "/sensors/:address/data" => sub {
         print $dbh->errstr();
         $self->render(status => 500, json => { result => 0, text => 'Database error occurred'});
     }
+};
+
+# for ember
+get "/sensorstats/:id" => sub {
+    my $self       = shift;
+    my $sensorid   = $self->param('id');
+    my @strings = ('pascals','humidity','fahrenheit','celsius','voltage');
+    my $stringquery = join(',', @strings);
+
+    my $dbh = _mysql_dbh($self, $config) or return;
+    my $sth = $dbh->prepare("SELECT id from sensor");
+    $sth->execute();
+    my $sensors = $sth->fetchall_arrayref({});
+    
+    my $response = {};
+        $sth = $dbh->prepare("SELECT UNIX_TIMESTAMP(date)*1000 as date,$stringquery from data where sensor_id=? and date >= DATE_SUB(NOW(),INTERVAL 1 HOUR)");
+        $sth->execute($sensorid);
+        my $data = $sth->fetchall_arrayref({});
+        my $sensorstats;
+        $sensorstats->{id} = $sensorid;
+        $sensorstats->{sensor_id} = $sensorid;
+        foreach my $str(@strings) {
+            my @temp = map {[$_->{date},$_->{$str}]} @{$data};
+            $sensorstats->{$str} = \@temp;
+        }
+        push @{$response->{sensorstats}}, $sensorstats;
+    $self->render(status => 200, json => $response);
+};
+
+# for ember
+get "/sensorstats" => sub {
+    my $self       = shift;
+    my @strings = ('pascals','humidity','fahrenheit','celsius','voltage');
+    my $stringquery = join(',', @strings);
+
+    my $dbh = _mysql_dbh($self, $config) or return;
+    my $sth = $dbh->prepare("SELECT id from sensor");
+    $sth->execute();
+    my $sensors = $sth->fetchall_arrayref({});
+    
+    my $response = {};
+    foreach my $sensor(@{$sensors}) {
+        #$sth = $dbh->prepare("SELECT date,$stringquery from data,sensor where sensor.id=data.sensor_id and sensor.sensor_address=? and date >= DATE_SUB(NOW(),INTERVAL 1 HOUR)");
+        $sth = $dbh->prepare("SELECT UNIX_TIMESTAMP(date)*1000 as date,$stringquery from data where sensor_id=? and date >= DATE_SUB(NOW(),INTERVAL 1 HOUR)");
+        $sth->execute($sensor->{id});
+        my $data = $sth->fetchall_arrayref({});
+        my $sensorstats;
+        $sensorstats->{id} = $sensor->{id};
+        $sensorstats->{sensor_id} = $sensor->{id};
+        foreach my $str(@strings) {
+            my @temp = map {[$_->{date},$_->{$str}]} @{$data};
+            $sensorstats->{$str} = \@temp;
+        }
+        push @{$response->{sensorstats}}, $sensorstats;
+    }
+    $self->render(status => 200, json => $response);
 };
 
 post "/sensors/:address/name" => sub {
