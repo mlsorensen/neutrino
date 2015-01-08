@@ -13,7 +13,7 @@ my $version = "0.1";
 
 get "/" => sub {
     my $self = shift;
-    $self->render_static("index.html");
+    $self->render("index.html");
 };
 
 get "/help-about.html" => {appname => $appname, version => $version} => sub {
