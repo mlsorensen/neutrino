@@ -2,7 +2,6 @@
     echo 'optargs=quiet drm.debug=7 capemgr.disable_partno=BB-BONELT-HDMI,BB-BONELT-HDMIN capemgr.enable_partno=BB-SPIDEV1' >> /boot/uboot/uEnv.txt 
     echo 'syntax on' > ~/.vimrc
     echo 'set paste tabstop=4 shiftwidth=4 expandtab ruler' >> ~/.vimrc
-    reboot
 
 2. Disable services:
 
@@ -18,11 +17,13 @@
     echo 'echo on > /sys/bus/usb/devices/usb2/power/control' >> /etc/rc.local
     echo 'echo BB-UART1 > /sys/devices/bone_capemgr.*/slots' >> /etc/rc.local
     echo '/usr/bin/cpufreq-set -g performance' >> /etc/rc.local
+    echo '/usr/bin/screen -dmS hub-avr-monitor /dev/ttyO1 57600'
     echo 'exit 0' >> /etc/rc.local
 
 4. apt-get update
 
 5. apt-get upgrade
+    reboot
 
 6. install mysql server and dependencies
     apt-get install mysql-server libmysqlclient-dev libconfig++-dev gcc-avr arduino
