@@ -2,6 +2,7 @@
     echo 'optargs=quiet drm.debug=7 capemgr.disable_partno=BB-BONELT-HDMI,BB-BONELT-HDMIN capemgr.enable_partno=BB-SPIDEV1' >> /boot/uboot/uEnv.txt 
     echo 'syntax on' > ~/.vimrc
     echo 'set paste tabstop=4 shiftwidth=4 expandtab ruler' >> ~/.vimrc
+    sed -i 's/#cape_disable=capemgr.disable_partno=BB-BONELT-HDMI,BB-BONELT-HDMIN$/cape_disable=capemgr.disable_partno=BB-BONELT-HDMI,BB-BONELT-HDMIN/g' /boot/uboot/uEnv.txt 
 
 2. Disable services:
 
