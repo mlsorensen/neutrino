@@ -16,25 +16,18 @@
     echo 'echo on > /sys/bus/usb/devices/usb1/power/control' >> /etc/rc.local
     echo 'echo on > /sys/bus/usb/devices/usb2/power/control' >> /etc/rc.local
     echo 'echo BB-UART1 > /sys/devices/bone_capemgr.*/slots' >> /etc/rc.local
-    echo '/usr/bin/cpufreq-set -g performance' >> /etc/rc.local
-    echo '/usr/bin/screen -dmS hub-avr-monitor /dev/ttyO1 57600'
+    echo '/usr/bin/screen -dmS hub-avr-monitor /dev/ttyO1 57600' >> /etc/rc.local
     echo 'exit 0' >> /etc/rc.local
+    sed -i "s/GOVERNOR=ondemand/GOVERNOR=performance/g" /etc/init.d/cpufrequtils
 
 4. apt-get update
 
 5. apt-get upgrade
+    (Install new kernel)
+    wget https://rcn-ee.net/deb/wheezy-armhf/v3.12.13-bone12/install-me.sh
+    chmod 750 install-me.sh
+    ./install-me.sh
     reboot
-
-Install new kernel
-    wget https://rcn-ee.net/deb/wheezy-armhf/v3.13.11-bone12/linux-image-3.13.11-bone12_1wheezy_armhf.deb
-    wget https://rcn-ee.net/deb/wheezy-armhf/v3.13.11-bone12/linux-firmware-image-3.13.11-bone12_1wheezy_armhf.deb
-    wget https://rcn-ee.net/deb/wheezy-armhf/v3.13.11-bone12/linux-headers-3.13.11-bone12_1wheezy_armhf.deb
-    dpkg -i linux*.deb
-    mv /boot/uboot/dtbs /boot/uboot/dtbs.bak
-    mv /boot/uboot/zImage /boot/uboot/zImage.bak
-    mv /boot/uboot/initrd.img /boot/uboot/initrd.img.bak
-    mv /boot/initrd.img-3.13.11-bone12 /boot/uboot/initrd.img
-    mv /boot/vmlinuz-3.13.11-bone12 /boot/uboot/zImage
 
 6. install mysql server and dependencies
     apt-get install mysql-server libmysqlclient-dev libconfig++-dev gcc-avr arduino
