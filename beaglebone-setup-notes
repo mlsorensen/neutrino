@@ -2,7 +2,6 @@
     echo 'optargs=quiet drm.debug=7 capemgr.disable_partno=BB-BONELT-HDMI,BB-BONELT-HDMIN capemgr.enable_partno=BB-SPIDEV1' >> /boot/uboot/uEnv.txt 
     echo 'syntax on' > ~/.vimrc
     echo 'set paste tabstop=4 shiftwidth=4 expandtab ruler' >> ~/.vimrc
-    sed -i 's/#cape_disable=capemgr.disable_partno=BB-BONELT-HDMI,BB-BONELT-HDMIN$/cape_disable=capemgr.disable_partno=BB-BONELT-HDMI,BB-BONELT-HDMIN/g' /boot/uboot/uEnv.txt 
 
 2. Disable services:
 
@@ -25,6 +24,17 @@
 
 5. apt-get upgrade
     reboot
+
+Install new kernel
+    wget https://rcn-ee.net/deb/wheezy-armhf/v3.13.11-bone12/linux-image-3.13.11-bone12_1wheezy_armhf.deb
+    wget https://rcn-ee.net/deb/wheezy-armhf/v3.13.11-bone12/linux-firmware-image-3.13.11-bone12_1wheezy_armhf.deb
+    wget https://rcn-ee.net/deb/wheezy-armhf/v3.13.11-bone12/linux-headers-3.13.11-bone12_1wheezy_armhf.deb
+    dpkg -i linux*.deb
+    mv /boot/uboot/dtbs /boot/uboot/dtbs.bak
+    mv /boot/uboot/zImage /boot/uboot/zImage.bak
+    mv /boot/uboot/initrd.img /boot/uboot/initrd.img.bak
+    mv /boot/initrd.img-3.13.11-bone12 /boot/uboot/initrd.img
+    mv /boot/vmlinuz-3.13.11-bone12 /boot/uboot/zImage
 
 6. install mysql server and dependencies
     apt-get install mysql-server libmysqlclient-dev libconfig++-dev gcc-avr arduino
