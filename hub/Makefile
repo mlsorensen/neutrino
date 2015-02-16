@@ -35,8 +35,22 @@ $(BUILDDIR)/md5_sbox.o: libs/md5/md5_sbox.c
 $(BUILDDIR)/b64encode.o: libs/base64/b64encode.c
 	$(CC) $(CFLAGS) -c $< -o $@ $(LIBINC)
 
+ifeq ($(PLATFORM), rpi)
+$(BUILDDIR)/RF24.o: $(BUILDDIR)/RF24-bcm.o $(BUILDDIR)/RF24-part.o
+	$(LD) -r $(BUILDDIR)/RF24-bcm.o $(BUILDDIR)/RF24-part.o -o $@ $(LIBINC)
+	rm -f $(BUILDDIR)/RF24-bcm.o
+	rm -f $(BUILDDIR)/RF24-part.o
+
+$(BUILDDIR)/RF24-bcm.o: libs/RF24-$(PLATFORM)/bcm2835.c
+	$(CC) $(CFLAGS) -c $< -o $@ $(LIBINC)
+
+$(BUILDDIR)/RF24-part.o: libs/RF24-$(PLATFORM)/RF24.cpp
+	$(CPP) $(CFLAGS) -c $< -o $@ $(LIBINC)
+
+else
 $(BUILDDIR)/RF24.o: libs/RF24-$(PLATFORM)/RF24.cpp
 	$(CPP) $(CFLAGS) -c libs/RF24-$(PLATFORM)/RF24.cpp -o $@ $(LIBINC)
+endif
 
 $(BUILDDIR)/gpio.o: libs/gpio/gpio.cpp
 	$(CPP) $(CFLAGS) -c libs/gpio/gpio.cpp -o $@ $(LIBINC)

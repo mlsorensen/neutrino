@@ -4,6 +4,11 @@
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
  version 2 as published by the Free Software Foundation.
+ 
+ 03/17/2013 : Charles-Henri Hallard (http://hallard.me)
+              Modified to use with Arduipi board http://hallard.me/arduipi
+              Modified to use the great bcm2835 library for I/O and SPI
+							
  */
 
 /**
@@ -16,8 +21,8 @@
 #define __RF24_H__
 
 #include "RF24_config.h"
-//#include "lib/RF24/compatibility.h"
-#include "compatibility.h"
+#include "./bcm2835.h"
+
 
 /**
  * Power Amplifier level.
@@ -47,10 +52,9 @@ typedef enum { RF24_CRC_DISABLED = 0, RF24_CRC_8, RF24_CRC_16 } rf24_crclength_e
 class RF24
 {
 private:
-  uint8_t ce_pin; /**< "Chip Enable" pin, activates the RX or TX role, unused on rpi */
-  string spidevice;
-  uint32_t spispeed;
+  uint8_t ce_pin; /**< "Chip Enable" pin, activates the RX or TX role */
   uint8_t csn_pin; /**< SPI Chip select */
+	uint16_t spi_speed; /**< SPI Bus Speed */
   bool wide_band; /* 2Mbs data rate in use? */
   bool p_variant; /* False for RF24L01 and true for RF24L01P */
   uint8_t payload_size; /**< Fixed size of payloads */
@@ -58,9 +62,11 @@ private:
   bool dynamic_payloads_enabled; /**< Whether dynamic payloads are enabled. */ 
   uint8_t ack_payload_length; /**< Dynamic size of pending ack payload. */
   uint64_t pipe0_reading_address; /**< Last address set on pipe 0 for reading. */
+	//uint32_t spispeed;
+  uint8_t debug ; /* Debug flag */
+  uint8_t spi_rxbuff[32] ; //SPI receive buffer (payload max 32 bytes)
+  uint8_t spi_txbuff[32+1] ; //SPI transmit buffer (payload max 32 bytes + 1 byte for the command)
 
-  SPI* spi;
-  
 protected:
   /**
    * @name Low-level internal interface.
@@ -71,25 +77,6 @@ protected:
    */
   /**@{*/
 
-  /**
-   * Set chip select pin
-   *
-   * Running SPI bus at PI_CLOCK_DIV2 so we don't waste time transferring data
-   * and best of all, we make use of the radio's FIFO buffers. A lower speed
-   * means we're less likely to effectively leverage our FIFOs and pay a higher
-   * AVR runtime cost as toll.
-   *
-   * @param mode HIGH to take this unit off the SPI bus, LOW to put it on
-   */
-  void csn(int mode);
-
-  /**
-   * Set chip enable
-   *
-   * @param level HIGH to actively begin transmission or LOW to put in standby.  Please see data sheet
-   * for a much more detailed description of this pin.
-   */
-  void ce(int level);
 
   /**
    * Read a chunk of data in from a register
@@ -239,24 +226,17 @@ public:
    * and send in the unique pins that this chip is connected to.
    *
    * @param _cepin The pin attached to Chip Enable on the RF module
-   * @param _cspin The pin attached to Chip SPI chipSelect
+   * @param _cspin The pin attached to Chip Select
    */
   RF24(uint8_t _cepin, uint8_t _cspin);
-  RF24(string _spidevice, uint32_t _spispeed, uint8_t _cepin);
+  RF24(uint8_t _cepin, uint8_t _cspin, uint32_t spispeed );
 
   /**
    * Begin operation of the chip
    *
    * Call this in setup(), before calling any other methods.
    */
-  void begin(void);
-
- /**
-   * Reset confguration of the chip
-   *
-   * Call this to reset all registers
-   */
-  void resetcfg(void);
+  bool begin(void);
 
   /**
    * Start listening on the pipes opened for reading.

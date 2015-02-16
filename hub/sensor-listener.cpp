@@ -8,6 +8,7 @@
 #include <skipjack.h>
 #include <hmac-md5.h>
 #include "sensor-listener.h"
+using namespace std;
 
 int main(int argc, char** argv) {
     //don't buffer what we print

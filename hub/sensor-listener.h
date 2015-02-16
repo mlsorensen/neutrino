@@ -29,7 +29,8 @@ int sensorhubid;
 
 //nRF24L01+, raspberry pi vs beaglebone black macros
 #if defined __ARM_ARCH_6__
-    RF24 radio("/dev/spidev0.0",8000000 , 25);
+    //RF24 radio("/dev/spidev0.0",8000000 , 25);
+    RF24 radio(RPI_V2_GPIO_P1_15, BCM2835_SPI_CS0, BCM2835_SPI_SPEED_4MHZ);    
 #elif defined __ARM_ARCH_7A__
     RF24 radio(115, 117);
 #else // build on non-arm with bogus initializer
