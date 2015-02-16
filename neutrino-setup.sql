@@ -49,7 +49,7 @@ CREATE TABLE neutrino.controller_capabilities (
   `setpoint` float DEFAULT NULL,
   UNIQUE `unique_index`(`controller_id`,`capability`),
   PRIMARY KEY (`id`),
-  FOREIGN KEY (`controller_id`) REFERENCES `controller` (`id`)
+  FOREIGN KEY (`controller_id`) REFERENCES neutrino.controller(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE neutrino.sensorgroup (
@@ -57,7 +57,7 @@ CREATE TABLE neutrino.sensorgroup (
   `display_name` varchar(255) UNIQUE NOT NULL,
   `controller_id` int(10) unsigned UNIQUE DEFAULT NULL,
   PRIMARY KEY (`id`),
-  CONSTRAINT `sensorgroup_ibfk_1` FOREIGN KEY (`controller_id`) REFERENCES `controller` (`id`)
+  CONSTRAINT `sensorgroup_ibfk_1` FOREIGN KEY (`controller_id`) REFERENCES neutrino.controller(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE neutrino.sensor_tie (
