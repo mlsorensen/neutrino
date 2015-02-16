@@ -1,0 +1,7 @@
+1. install NOOBS
+
+2. apt-get update
+
+3. sudo apt-get install mysql-server-5.5 libmysqlclient-dev libconfig++-dev gcc-avr arduino vim screen libjson-perl
+
+4. run 'raspi-config', go to advanced settings to enable SPI
