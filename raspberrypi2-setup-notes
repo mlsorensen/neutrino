@@ -2,8 +2,32 @@
 
 2. apt-get update
 
-3. sudo apt-get install mysql-server-5.5 libmysqlclient-dev libconfig++-dev gcc-avr arduino vim screen libjson-perl
+3. install software
+   sudo apt-get install mysql-server-5.5 libmysqlclient-dev libconfig++-dev gcc-avr arduino vim screen libjson-perl
+   sudo cpan -i Mojolicious::Lite Mojolicious::Validator File::Slurp JSON DateTime
 
 4. run 'raspi-config', go to advanced settings to enable SPI
 
-5. disable serial console in /etc/inittab, replace with "T0:23:respawn:/usr/bin/screen -S hub-avr-monitor /dev/ttyO1 57600"
+4.5 (optional wifi)
+	echo "options 8192cu rtw_power_mgnt=0 rtw_enusbss=0" > /etc/modprobe.d/8192cu.conf
+
+5. disable serial console in /etc/inittab, replace with "T0:23:respawn:/usr/bin/screen -S hub-avr-monitor /dev/AMA01 57600"
+
+6. start sensor-listener:
+     cd $neutrino-path/hub;
+     cp sensor-listener.cfg.ex /etc/sensor-listener.cfg
+     (edit /etc/sensor-listener.cfg)
+     screen -S sensor-listener -d -m ./sensor-listener -c /etc/sensor-listener.cfg
+
+7. build/install hub avr software
+    cd ~/neutrino/hub-avr
+    make
+    make install
+    
+8. build/run controller software
+    cd ~/neutrino/controller/libs/Neutrino-Hub
+    perl Makefile.PL; make; make install
+    cd ../..
+    cp controller.conf /etc/controller.conf
+    <edit /etc/controller.conf>
+    screen -dmS controller ./controller -c /etc/controller.conf
