@@ -4,10 +4,10 @@ use Data::Dumper;
 
 my $h = new Neutrino::Hub({"debug" => 1});
 #$h->test_msg();
-#$h->reset();
-#sleep 2;
-$h->cool();
+$h->reset();
 sleep 2;
+#$h->cool();
+#sleep 2;
 $h->humidify();
 sleep 2;
 $h->idle();

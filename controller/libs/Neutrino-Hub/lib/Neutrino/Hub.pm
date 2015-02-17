@@ -41,6 +41,9 @@ sub new {
     if (host_type() eq 'bbb') {
         $self->{reset_pin}    = 51;
         $self->{serial_port}  = '/dev/ttyO1';
+    } else {
+	$self->{reset_pin}    = 20;
+        $self->{serial_port}  = '/dev/ttyAMA0';
     }
 
     $self->{settings} = shift;
@@ -235,8 +238,11 @@ sub reset {
 }
 
 sub host_type {
-    #TODO: logic to choose bbb or raspberry pi
-    return "bbb";
+    if (-e "/dev/ttyAMA0") {
+        return "rpi";
+    } else {
+        return "bbb";
+    }
 }
 
 
@@ -248,9 +254,9 @@ sub set_gpio {
     my $pindir = "/sys/class/gpio/gpio$pin";
 
     if (! -e $pindir) {
-        open(FILE, ">/sys/class/gpio/export");
-        print FILE $pin;
-        close FILE;
+        open(EXPORT, ">/sys/class/gpio/export");
+        print EXPORT $pin;
+        close EXPORT;
     }
 
     if (! -e $pindir) {
