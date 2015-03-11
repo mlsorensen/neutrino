@@ -1,4 +1,6 @@
 #include <cstdlib>
+#include <ctime>
+#include <vector>
 #include <iostream>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -18,6 +20,9 @@ int main(int argc, char** argv) {
     //get arguments, set things up
     get_args(argc,argv);
 
+    if ( generator )
+        launch_random_generator();
+
     // set up radio
     radio_init();
 
@@ -26,7 +31,7 @@ int main(int argc, char** argv) {
             fprintf(stderr, "got message on radio\n");
             message message;
             bool nread = radio.read(&message, sizeof message);
-            
+
             // parse message header
             int messagetype = 0x3 & message.header;
             int sensoraddr  = (0x1c & message.header) >> 2;
@@ -51,6 +56,57 @@ int main(int argc, char** argv) {
     }
 
     return 0;
+}
+
+template<typename T> T generate_random(std::vector<T>& elems, int pos, int add, int sub) {
+    elems[pos] = elems[pos] + (rand() % add) - sub;
+
+    if ( elems[pos] > 60000 )
+        elems[pos] = rand() % 15;
+
+    return elems[pos];
+}
+
+void launch_random_generator() {
+    srand(time(0));
+
+    std::vector<int16_t>  temps;
+    std::vector<int16_t>  humds;
+    std::vector<uint16_t> press;
+    std::vector<uint16_t> volts;
+
+    for ( int jj = 0; jj < generator_count; jj++ ) {
+        insert_fake_sensor((uint8_t) jj);
+        temps.push_back((rand() % 30) + 10);
+        humds.push_back((rand() % 30) + 10);
+        press.push_back((rand() % 10) + 5);
+        volts.push_back((rand() %  5) + 5);
+    }
+
+    uint8_t sig[SIGNATURE_KEY_SIZE] = {};
+
+    while ( 1 ) {
+        for ( int ii = 0; ii < generator_count; ii++ ) {
+            struct sensordata data;
+            data.addr = ii;
+            data.proximity  = rand() % 2;
+            data.tempc      = generate_random(temps, ii, 5, 3);
+            data.humidity   = generate_random(humds, ii, 2, 2);
+            data.pressuredp = generate_random(press, ii, 2, 2);
+            data.millivolts = generate_random(volts, ii, 1, 1);
+            data.signature[0] = 0;
+
+            std::cout << "addr=" << (int) data.addr << ", tempc=" << data.tempc << ", humidity=" << data.humidity << ", pressuredp=" << data.pressuredp << ", millivolts=" << data.millivolts;
+
+            if (insert_neutrino_data(&data) != 0) {
+                std::cout << "Failed to insert" << std::endl;
+                exit(0);
+            }
+        }
+        std::cout << "" << std::endl;
+
+        sleep(generator_interval);
+    }
 }
 
 float ctof (int16_t c) {
@@ -141,6 +197,30 @@ void handle_pairing_message(message * message, int addr) {
     } else {
         fprintf(stderr, "sensor hub not in discovery mode, skipping\n");
     }
+}
+
+void insert_fake_sensor(uint8_t addr) {
+    MYSQL *conn;
+    conn = mysql_init(NULL);
+    if (!mysql_real_connect(conn, mysqlserver, mysqluser, mysqlpass, mysqldb, 0, NULL, 0)) {
+        fprintf(stderr, "Cant connect to database: %s\n", mysql_error(conn));
+        exit(1);
+    } else {
+        fprintf(stdout, "Connected to database\n");
+    }
+    fprintf(stdout, "adding sensor %d into database for hub %d\n", addr, sensorhubid);
+
+    ostringstream sql;
+    sql << "INSERT IGNORE INTO sensor (sensor_address,sensor_hub_id,sensor_encryption_key,sensor_signature_key) VALUES ("
+        << (int) addr << "," << (int) sensorhubid << ", 'FAKE', 'MORE_FAKE')";
+    fprintf(stderr, "sql is '%s'\n", sql.str().c_str());
+
+    if (mysql_query(conn, sql.str().c_str())) {
+        fprintf(stderr, "SQL error on sensor insert: %s\n", mysql_error(conn));
+        return;
+    }
+    fprintf(stdout,"ran sql\n");
+    mysql_close(conn);
 }
 
 bool sensor_is_known(int sensoraddr) {
@@ -470,6 +550,11 @@ void get_args(int argc, char *argv[]) {
         zabbixserver = cfg.lookup("zabbixserver").c_str();
         zabbixport   = atoi(cfg.lookup("zabbixport").c_str());
         zabbixclient = cfg.lookup("zabbixclient").c_str();
+        generator    = cfg.exists("generator");
+        if ( generator ) {
+            generator_count    = atoi(cfg.lookup("generator_count").c_str());
+            generator_interval = atoi(cfg.lookup("generator_interval").c_str());
+        }
     } catch (const SettingNotFoundException &settingexception) {
         fprintf(stderr, "A setting was not found: %s -- set any unneeded options to ''\n", settingexception.getPath());
         exit(1);
