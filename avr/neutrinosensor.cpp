@@ -10,6 +10,7 @@
 #include <LowPower.h>
 #include <skipjack.h>
 #include <hmac-md5.h>
+#include <sha1.h>
 
 #define EEPROM_ENC_KEY_ADDR 0x00
 #define EEPROM_ENC_KEY_SIZE 10
@@ -69,7 +70,7 @@ volatile unsigned long bouncetime=0;
 // this struct should always be a multiple of 64 bits so we can easily encrypt it (skipjack 64bit blocks)
 // data is passed as integers, therefore decimals are shifted where noted to maintain precision
 struct sensordata {
-    uint8_t   addr         = myaddr;
+    uint8_t  addr         = myaddr;
     bool     proximity    = true; // sensor closed or open
     int16_t  tempc        = 0; // temp in centicelsius
     int16_t  humidity     = 0; // humidity in basis points (percent of percent)
@@ -290,9 +291,9 @@ void sendPairingMessage() {
 
 void flash(int pin) {
   digitalWrite(pin, HIGH);
-  delay(2);
+  delay(3);
   digitalWrite(pin, LOW);
-  delay(2);
+  delay(1);
 }
 
 void pulse(int pin) {
@@ -417,9 +418,31 @@ bool keyIsEmpty(byte * key, int size) {
     return true;
 }
 
-void generateKey(byte * key, int size) {
-   randomSeed(analogRead(A0));
-   for (int i = 0; i < size; i++) {
-       key[i] = (unsigned char) random(0,255);  
-   } 
+void generateKey(byte * key, int keySize) {
+    randomSeed(analogRead(A0)); // random() will be used only to set the delays between samples
+    uint32_t seedSize = keySize * 100;
+
+    unsigned char seed[seedSize];
+    int e = 0; // entropy
+    int r = 0; // remaining unused bits, because 8 doesn't divide neatly into 10
+    digitalWrite(RF_BAD_LED, HIGH);
+    digitalWrite(LO_BATT_LED, HIGH);
+    for (int i = 0; i < seedSize; ++i) {
+        seed[i] = (unsigned char)(e >> (keySize - r));
+        e = analogRead(A0);
+        seed[i] = (unsigned char)(seed[i] | (e & (0x3FF >> r)));
+        r = 10 - r;
+        delay(random(1, 20)); // The correct delay range is hardware-dependent; this is just an example.
+    }
+    digitalWrite(RF_BAD_LED, LOW);
+    digitalWrite(LO_BATT_LED, LOW);
+
+    unsigned char hash[20]; // SHA-1 produces a 160-bit hash.
+    sha1(hash, seed, seedSize);
+
+    // Hash the hash, because we actually want an 80-bit key.
+    for(int i = 0; i < keySize; ++i) {
+        key[i] = (unsigned char)(hash[2*i] ^ hash[2*i +1]); // bitwise XOR, the poor man's hash
+    }
+    pulse(RF_GOOD_LED);
 }

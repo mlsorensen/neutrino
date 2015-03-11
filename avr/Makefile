@@ -22,7 +22,7 @@ all: $(BUILDDIR)/$(PROG).o
 	avr-objcopy -O ihex -R .eeprom $(BUILDDIR)/$(PROG).elf $(BUILDDIR)/$(PROG).hex
 	avr-size --mcu=$(MCU) --format=avr -C $(BUILDDIR)/$(PROG).elf
 
-$(BUILDDIR)/$(PROG).o: $(PROG).cpp $(patsubst %,$(BUILDDIR)/%.o, $(ARDUINO_CPP) $(ARDUINO_C) skipjack BMP180 SI7021 RF24 LowPower hmac-md5)
+$(BUILDDIR)/$(PROG).o: $(PROG).cpp $(patsubst %,$(BUILDDIR)/%.o, $(ARDUINO_CPP) $(ARDUINO_C) sha1 skipjack BMP180 SI7021 RF24 LowPower hmac-md5)
 	$(CPP) -c $(PROG).cpp -o $@ $(INCLUDE) $(DEFINE) $(EXTRA) -std=c++11
 
 $(BUILDDIR)/RF24.o: $(BUILDDIR)/SPI.o libs/RF24/RF24.cpp
@@ -63,6 +63,9 @@ $(BUILDDIR)/%.o: arduino-core/%.c
 
 $(BUILDDIR)/skipjack.o: libs/skipjack/skipjack.c
 	$(CC) -c libs/skipjack/skipjack.c -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
+
+$(BUILDDIR)/sha1.o: libs/sha1/sha1.c
+	$(CC) -c $< -o $@ $(INCLUDE) $(DEFINE) $(EXTRA)
 
 clean:
 	@if [ -e build ]; then echo cleaning build dir; rm -rf build; fi
