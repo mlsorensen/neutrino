@@ -3,8 +3,11 @@
 2. apt-get update
 
 3. install software
-   sudo apt-get install mysql-server-5.5 libmysqlclient-dev libconfig++-dev gcc-avr arduino vim screen libjson-perl
-   sudo cpan -i Mojolicious::Lite Mojolicious::Validator File::Slurp JSON DateTime
+    sudo apt-get install mysql-server-5.5 libmysqlclient-dev libconfig++-dev gcc-avr arduino vim screen libjson-perl avahi-daemon
+    sudo cpan -i Mojolicious::Lite Mojolicious::Validator File::Slurp JSON DateTime
+    sudo insserv avahi-daemon
+    sudo insserv mysql
+    sudo cp ~/neutrino/web/mdns/avahi/neutrino.service /etc/avahi/services/
 
 4. run 'raspi-config', go to advanced settings to enable SPI
 
@@ -12,6 +15,8 @@
 	echo "options 8192cu rtw_power_mgnt=0 rtw_enusbss=0" > /etc/modprobe.d/8192cu.conf
 
 5. disable serial console in /etc/inittab by commenting out last line
+
+(reboot)
 
 6. start sensor-listener:
     cd $neutrino-path/hub;
