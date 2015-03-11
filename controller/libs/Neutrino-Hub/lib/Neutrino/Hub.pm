@@ -11,13 +11,6 @@ require Exporter;
 
 our @ISA = qw(Exporter);
 
-# Items to export into callers namespace by default. Note: do not export
-# names by default without a very good reason. Use EXPORT_OK instead.
-# Do not simply export all your public functions/methods/constants.
-
-# This allows declaration	use Neutrino::Hub ':all';
-# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
-# will save memory.
 our %EXPORT_TAGS = ( 'all' => [ qw(
 	
 ) ] );
@@ -48,7 +41,18 @@ sub new {
 
     $self->{settings} = shift;
 
+     set_up_screen();
+
     return $self;
+}
+
+sub set_up_screen {
+    my $process = "/usr/bin/screen";
+    my $args = "-dmS console /dev/ttyAMA0 57600";
+    if (`ps -ef | grep -- "$args" | grep -v grep || echo -n setup` eq "setup") {
+        print "need to set up screen\n";
+        `$process $args`;
+    }
 }
 
 sub test_msg {
@@ -177,10 +181,10 @@ sub clear_relays {
 
 sub send_msg {
     my $self = shift;
-    my $msg = shift;
+    my $msg = shift . "\r\n";
 
     if ($self->{settings}->{debug}) {
-        print "DEBUG: send_msg: sending $msg\n";
+        print "DEBUG: send_msg: sending $msg";
     }
 
     open(PORT, ">$self->{serial_port}");
@@ -188,14 +192,14 @@ sub send_msg {
         local $SIG{ALRM} = sub { die "DEBUG: send_msg: Failed in FLOCK of $self->{serial_port}" };
         alarm 30;
         flock(PORT, LOCK_EX);
-        print PORT $msg . "\r\n";
+        print PORT $msg;
         alarm 0;
     };
     print $@ if $@;
     close PORT;
 
     if ($self->{settings}->{debug}) {
-        print "DEBUG: send_msg: sent    $msg\n";
+        print "DEBUG: send_msg: sent $msg";
     }
 }
 
@@ -264,7 +268,7 @@ sub set_gpio {
         return;
     }
 
-    open(FILE, ">$pindir/direction");
+    open(FILE, ">$pindir/direction") or die "$^E\n";
     print FILE $direction;
     close FILE;
 

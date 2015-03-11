@@ -491,7 +491,8 @@ void ack(bool success, const char * msg) {
     outgoing["result"] = success;
     outgoing["detail"] = msg;
 
-    Serial.println(outgoing);
+    Serial.print(outgoing);
+    Serial.print("\r\n");
 }
 
 void test_relay(int pin) {
