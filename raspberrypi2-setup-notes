@@ -11,13 +11,14 @@
 4.5 (optional wifi)
 	echo "options 8192cu rtw_power_mgnt=0 rtw_enusbss=0" > /etc/modprobe.d/8192cu.conf
 
-5. disable serial console in /etc/inittab, replace with "T0:23:respawn:/usr/bin/screen -S hub-avr-monitor /dev/AMA01 57600"
+5. disable serial console in /etc/inittab by commenting out last line
 
 6. start sensor-listener:
-     cd $neutrino-path/hub;
-     cp sensor-listener.cfg.ex /etc/sensor-listener.cfg
-     (edit /etc/sensor-listener.cfg)
-     screen -S sensor-listener -d -m ./sensor-listener -c /etc/sensor-listener.cfg
+    cd $neutrino-path/hub;
+    sudo cp sensor-listener.cfg.ex /etc/sensor-listener.cfg
+    make
+    (edit /etc/sensor-listener.cfg)
+    screen -dmS sensor-listener sudo ~/neutrino/hub/sensor-listener -c /etc/sensor-listener.cfg
 
 7. build/install hub avr software
     cd ~/neutrino/hub-avr
@@ -26,8 +27,13 @@
     
 8. build/run controller software
     cd ~/neutrino/controller/libs/Neutrino-Hub
-    perl Makefile.PL; make; make install
+    perl Makefile.PL; make; sudo make install
     cd ../..
-    cp controller.conf /etc/controller.conf
-    <edit /etc/controller.conf>
-    screen -dmS controller ./controller -c /etc/controller.conf
+    sudo cp controller.conf /etc/controller.conf
+    make
+    (edit /etc/controller.conf)
+    screen -dmS controller sudo ~/neutrino/controller/controller -c /etc/controller.conf
+
+9. build/run web services
+    cd ~/neutrino/web
+    hypnotoad neutrino-webapp
