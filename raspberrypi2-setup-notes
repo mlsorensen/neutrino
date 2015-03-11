@@ -36,4 +36,4 @@
 
 9. build/run web services
     cd ~/neutrino/web
-    hypnotoad neutrino-webapp
+    sudo hypnotoad neutrino-webapp
