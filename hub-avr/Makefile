@@ -8,7 +8,7 @@ PROG         = neutrinohub-avr
 DEFINE       = -DARDUINO=105 -D__AVR_ATmega328P__ -DF_CPU=16000000L -D__PROG_TYPES_COMPAT__
 EXTRA        = -Os -mmcu=$(MCU) -fno-exceptions -ffunction-sections -fdata-sections -Wno-deprecated-declarations -MMD -lm
 AVRDUDE      = bin/avrdude
-AVRDUDE_CONF = avrdude.conf
+AVRDUDE_CONF = $(shell if [ -e /dev/ttyAMA0 ]; then echo avrdude-rpi.conf; else echo avrdude.conf; fi)
 BUILDDIR     = build
 ARDUINO_CPP  = $(shell find arduino-core -maxdepth 1 -name "*.cpp" -exec basename {} \;| cut -d. -f1)
 ARDUINO_C    = $(shell find arduino-core -maxdepth 1 -name "*.c" -exec basename {} \;| cut -d. -f1)
