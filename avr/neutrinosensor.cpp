@@ -37,7 +37,7 @@
 #define PAIRING_INT 1
 #define PAIRING_PIN 3
 
-#define BOUNCE_DURATION 50
+#define BOUNCE_DURATION 60
 
 #define RF_GOOD_LED A0
 #define RF_BAD_LED 4
@@ -90,7 +90,7 @@ struct pairingdata {
 header is one byte that represents the following:
 
 MSB  00000000  LSB
-     RRRAAAMM
+     RAAAAAMM
 
 MM - message type
      00 - contains sensor data message
@@ -98,9 +98,9 @@ MM - message type
      10 - reserved
      11 - reserved
 
-AAA - sensor address (if applicable)
+AAAAA - sensor address (if applicable)
 
-RRR - reserved
+R - reserved
 */
 
 struct sensordatamessage {
@@ -114,7 +114,7 @@ struct sensorpairingmessage {
 };
 
 RF24 radio(8,9);
-const uint64_t pipe = 0xFCFCFCFC00LL + (mychannel << 8) + myaddr;
+const uint64_t pipe = 0xFCFCFCFC00LL + (mychannel << 8) + (myaddr % 6);
 //const uint64_t pipes[6] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL }; 
 BMP180 bsensor;
 SI7021 hsensor;
@@ -144,7 +144,7 @@ void setup() {
     // turn off brown-out enable in software
     MCUCR = bit (BODS) | bit (BODSE);
     MCUCR = bit (BODS); 
-    sleep_cpu ();
+    sleep_cpu();
   
     pinMode(RF_GOOD_LED,OUTPUT);
     pinMode(RF_BAD_LED,OUTPUT);
@@ -298,14 +298,14 @@ void flash(int pin) {
 
 void pulse(int pin) {
    // software pwm, flash light for ~1 second with short duty cycle
-   for (int i = 0; i < 50; i++) {
+   for (int i = 0; i < 40; i++) {
        digitalWrite(pin, HIGH);
        delay(1);
        digitalWrite(pin,LOW);
-       delay(9);
+       delay(4);
    }
    digitalWrite(pin,LOW);
-   LowPower.powerDown(SLEEP_500MS, ADC_OFF, BOD_OFF);   
+   LowPower.powerDown(SLEEP_250MS, ADC_OFF, BOD_OFF);   
 }
 
 // used for debugging, sending message output over rf
@@ -353,6 +353,16 @@ int getMyAddr() {
     pinMode(ADDRESS_PIN_0, INPUT_PULLUP);
     pinMode(ADDRESS_PIN_1, INPUT_PULLUP);
     pinMode(ADDRESS_PIN_2, INPUT_PULLUP);
+    pinMode(ADDRESS_PIN_3, INPUT_PULLUP);
+    pinMode(ADDRESS_PIN_4, INPUT_PULLUP);
+
+    if(!digitalRead(ADDRESS_PIN_4)) {
+        result = result + 16;
+    }
+
+    if(!digitalRead(ADDRESS_PIN_3)) {
+        result = result + 8;
+    }
     
     if(!digitalRead(ADDRESS_PIN_2)) {
         result = result + 4;  
@@ -373,6 +383,10 @@ int getMyAddr() {
     digitalWrite(ADDRESS_PIN_1, LOW);
     pinMode(ADDRESS_PIN_2, OUTPUT);
     digitalWrite(ADDRESS_PIN_2, LOW);
+    pinMode(ADDRESS_PIN_3, OUTPUT);
+    digitalWrite(ADDRESS_PIN_3, LOW);
+    pinMode(ADDRESS_PIN_4, OUTPUT);
+    digitalWrite(ADDRESS_PIN_4, LOW);
     
     return result; 
 }
