@@ -118,7 +118,6 @@ void handle_pairing_message(message * message, int addr) {
     printf("encryption key is %s\n",enckey);
     printf("hmac key is %x%x%x%x\n", pdata.sigkey[0], pdata.sigkey[1], pdata.sigkey[2], pdata.sigkey[3]);
 
-
     // if we are in discovery mode, save the keys, otherwise, ignore
     if (listener_should_discover()) {
         MYSQL *conn;
@@ -129,10 +128,21 @@ void handle_pairing_message(message * message, int addr) {
         } else {
             fprintf(stdout, "Connected to database\n");
         }
+
+        // delete old sensor if we already have a key stored
+        if (sensor_is_known(addr)) {
+            printf("Deleting old sensor %d\n", addr);
+            if(delete_sensor(addr, conn)) {
+                printf("Deleted old sensor\n");
+            } else {
+                printf("Failed to delete sensor\n");
+            }
+        }
+
         fprintf(stdout, "adding sensor %d into database for hub %d\n", addr, sensorhubid);
 
         ostringstream sql;
-        sql << "INSERT IGNORE INTO sensor (sensor_address,sensor_hub_id,sensor_encryption_key,sensor_signature_key) VALUES (" 
+        sql << "INSERT INTO sensor (sensor_address,sensor_hub_id,sensor_encryption_key,sensor_signature_key) VALUES (" 
             << (int) addr << "," << (int) sensorhubid << ", '" << std::string(pdata.enckey, pdata.enckey + SKIPJACK_KEY_SIZE) 
             << "','" << std::string(pdata.sigkey, pdata.sigkey + SIGNATURE_KEY_SIZE) <<"')";
         fprintf(stderr, "sql is '%s'\n", sql.str().c_str());
@@ -148,7 +158,23 @@ void handle_pairing_message(message * message, int addr) {
     }
 }
 
-bool sensor_is_known(int sensoraddr) {
+bool delete_sensor(int sensoraddr, MYSQL * conn) {
+    int id = sensor_addr_to_id(sensoraddr);
+    ostringstream sqldeldata;
+    ostringstream sqldeltie;
+    ostringstream sqldelsensor;
+    sqldeldata << "DELETE from data where sensor_id=" << (int) id; 
+    sqldeltie << "DELETE from sensor_tie where sensor_id=" << (int) id;
+    sqldelsensor << "DELETE from sensor where id=" << (int) id;
+    mysql_query(conn, sqldeldata.str().c_str());
+    mysql_query(conn, sqldeltie.str().c_str());
+    if (mysql_query(conn, sqldelsensor.str().c_str())) {
+        return false;
+    }
+    return true;
+}
+
+int sensor_addr_to_id(int sensoraddr) {
     ostringstream sql;
     sql << "SELECT id from sensor where sensor_address=" << (int) sensoraddr << " and sensor_hub_id=" << (int) sensorhubid;
     MYSQL_ROW row;
@@ -156,14 +182,21 @@ bool sensor_is_known(int sensoraddr) {
     row = sql_select_row(sql.str().c_str());
 
     if (row == NULL) {
-        return false;
+        return 0;
     }
 
     if (row[0] > 0) {
-        fprintf(stderr, "found sensor id %s\n", row[0]);
+        return atoi(row[0]);
+    }
+    return 0;
+}
+
+bool sensor_is_known(int sensoraddr) {
+    int sensorid = sensor_addr_to_id(sensoraddr);
+    if (sensorid > 0) {
+        fprintf(stderr, "found sensor id %d\n", sensorid);
         return true;
     }
-
     return false;
 }
 

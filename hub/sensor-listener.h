@@ -61,7 +61,7 @@ pairingdata {
 header is one byte that represents the following:
 
 MSB  00000000  LSB
-     RRRAAAMM
+     RAAAAAMM
 
 MM - message type
      00 - contains sensor data message
@@ -69,9 +69,9 @@ MM - message type
      10 - reserved
      11 - reserved
 
-AAA - sensor address (if applicable)
+AAAAA - sensor address (if applicable)
 
-RRR - reserved
+R - reserved
 */
 
 struct message {
@@ -106,6 +106,7 @@ unsigned int get_sensor_id(MYSQL * conn, int sensorid, int sensorhubid);
 MYSQL_ROW sql_select_row(const char * sql);
 void handle_sensor_message(message * message, int addr);
 void handle_pairing_message(message * message, int addr);
-
+bool delete_sensor(int addr, MYSQL * conn);
+int sensor_addr_to_id(int sensoraddr);
 
 #endif
