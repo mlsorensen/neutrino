@@ -8,6 +8,7 @@
 #include <skipjack.h>
 #include <hmac-md5.h>
 #include "sensor-listener.h"
+#include <sys/time.h>
 using namespace std;
 
 int main(int argc, char** argv) {
@@ -23,13 +24,17 @@ int main(int argc, char** argv) {
 
     while(1) {
         if (radio.available()) {
-            fprintf(stderr, "got message on radio\n");
+            struct timeval start, end;
+            gettimeofday(&start, NULL);
+            printf("!!!!!!!!!!! got message on radio !!!!!!!!!!!!\n");
             message message;
             bool nread = radio.read(&message, sizeof message);
+            gettimeofday(&end, NULL);
+            printf("Took %ldus to read message\n", end.tv_usec - start.tv_usec);
             
             // parse message header
             int messagetype = 0x3 & message.header;
-            int sensoraddr  = (0x1c & message.header) >> 2;
+            int sensoraddr  = (0x7c & message.header) >> 2;
 
             if(nread) {
                 if(messagetype == 0) {
@@ -70,7 +75,7 @@ void handle_sensor_message(message * message, int addr) {
     fprintf(stderr, "checking signature for sensor data\n");
     if (check_sensordata_signature(&data) == false) {
         printf("unable to verify signature on decrypted data from sensor %d, ignoring\n", addr);
-        //return;
+        return;
     }
 
     printf("radio at address %d :\n", addr);

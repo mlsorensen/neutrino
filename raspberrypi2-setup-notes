@@ -23,7 +23,7 @@
     sudo cp sensor-listener.cfg.ex /etc/sensor-listener.cfg
     make
     (edit /etc/sensor-listener.cfg)
-    screen -dmS sensor-listener sudo ~/neutrino/hub/sensor-listener -c /etc/sensor-listener.cfg
+    screen -dmS sensor-listener sudo ./sensor-listener -c /etc/sensor-listener.cfg
 
 7. build/install hub avr software
     cd ~/neutrino/hub-avr
@@ -37,7 +37,7 @@
     sudo cp controller.conf /etc/controller.conf
     make
     (edit /etc/controller.conf)
-    screen -dmS controller sudo ~/neutrino/controller/controller -c /etc/controller.conf
+    screen -dmS controller sudo ./controller -c /etc/controller.conf
 
 9. build/run web services
     cd ~/neutrino/web
