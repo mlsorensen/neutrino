@@ -436,27 +436,33 @@ void generateKey(byte * key, int keySize) {
     randomSeed(analogRead(A0)); // random() will be used only to set the delays between samples
     uint32_t seedSize = keySize * 100;
 
-    unsigned char seed[seedSize];
+    byte seed[seedSize];
     int e = 0; // entropy
     int r = 0; // remaining unused bits, because 8 doesn't divide neatly into 10
     digitalWrite(RF_BAD_LED, HIGH);
     digitalWrite(LO_BATT_LED, HIGH);
     for (int i = 0; i < seedSize; ++i) {
-        seed[i] = (unsigned char)(e >> (keySize - r));
-        e = analogRead(A0);
-        seed[i] = (unsigned char)(seed[i] | (e & (0x3FF >> r)));
-        r = 10 - r;
-        delay(random(1, 20)); // The correct delay range is hardware-dependent; this is just an example.
+        seed[i] = (byte)e;
+        if(r < 8) {
+            delay(random(1, 20));
+            e = analogRead(A0);
+            seed[i] = (byte)(seed[i] ^ ((e << r) & 0xFF));
+            e = e >> (8 - r);
+            r += 2;
+        } else {
+            e = e >> 8;
+            r -= 8;
+        }
     }
     digitalWrite(RF_BAD_LED, LOW);
     digitalWrite(LO_BATT_LED, LOW);
 
-    unsigned char hash[20]; // SHA-1 produces a 160-bit hash.
+    byte hash[20]; // SHA-1 produces a 160-bit hash.
     sha1(hash, seed, seedSize);
 
     // Hash the hash, because we actually want an 80-bit key.
     for(int i = 0; i < keySize; ++i) {
-        key[i] = (unsigned char)(hash[2*i] ^ hash[2*i +1]); // bitwise XOR, the poor man's hash
+        key[i] = (byte)(hash[2*i] ^ hash[2*i +1]); // bitwise XOR, the poor man's hash
     }
     pulse(RF_GOOD_LED);
 }
