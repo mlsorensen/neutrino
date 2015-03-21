@@ -13,6 +13,14 @@
 
 4.5 (optional wifi)
 	echo "options 8192cu rtw_power_mgnt=0 rtw_enusbss=0" > /etc/modprobe.d/8192cu.conf
+  edit /etc/wpa_supplicant/wpa_supplicant.conf to show the following: 
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+
+network={
+    ssid="cheetos-24"
+    psk="begoodonmynetwork"
+}
 
 5. disable serial console in /etc/inittab by commenting out last line
 
