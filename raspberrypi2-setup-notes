@@ -7,7 +7,8 @@
     sudo cpan -i Mojolicious::Lite Mojolicious::Validator File::Slurp JSON DateTime
     sudo insserv avahi-daemon
     sudo insserv mysql
-    sudo cp ~/neutrino/web/mdns/avahi/neutrino.service /etc/avahi/services/
+    git clone https://github.com/mlsorensen/neutrino
+    sudo cp ~/neutrino/web/mdns/avahi/neutrino.service /etc/avahi/services/ # allows you to connect via 'http://raspberrypi.local' on mac
 
 4. run 'raspi-config', go to advanced settings to enable SPI
 
@@ -27,7 +28,9 @@ network={
 (reboot)
 
 6. start sensor-listener:
-    cd $neutrino-path/hub;
+    cd ~/neutrino
+    sudo mysql < neutrino-setup.sql
+    cd hub;
     sudo cp sensor-listener.cfg.ex /etc/sensor-listener.cfg
     make
     (edit /etc/sensor-listener.cfg)
