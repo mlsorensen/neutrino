@@ -379,14 +379,14 @@ unsigned int get_sensor_id(MYSQL *conn, int sensor_addr, int sensor_hub_id) {
 
 void radio_init() {
     radio.begin();
-    radio.setChannel(sensorhubid);
+    radio.setChannel(sensorhubid + CHANNEL_OFFSET);
     radio.setPALevel(RF24_PA_MAX);
     radio.setDataRate(RF24_250KBPS);
     radio.setPayloadSize(PAYLOAD_SIZE);
     radio.setRetries(6,15);
 
     for(int i = 0; i < 6; i++) {
-        uint64_t pipe = 0XFCFCFCFC00LL + (sensorhubid << 8) + i;
+        uint64_t pipe = 0XFCFCFCFC00LL + ((sensorhubid + CHANNEL_OFFSET) << 8) + i;
         printf("pipe %d is address %#012llx\n", i, pipe);
         pipes[i] = pipe;
         radio.openReadingPipe(i, pipes[i]);

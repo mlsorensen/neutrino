@@ -24,6 +24,7 @@
 #define CHANNEL_PIN_0 10
 #define CHANNEL_PIN_1 A3
 #define CHANNEL_PIN_2 A2
+#define CHANNEL_OFFSET 60
 
 #define ADDRESS_PIN_0 5
 #define ADDRESS_PIN_1 6
@@ -418,7 +419,7 @@ int getMyChannel() {
     digitalWrite(CHANNEL_PIN_2, LOW);
 
     // we use channels 60-75
-    result += 60;
+    result += CHANNEL_OFFSET;
 
     return result;
 }

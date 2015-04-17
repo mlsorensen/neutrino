@@ -10,6 +10,8 @@
 #define SIGNATURE_SIZE 6
 #define PAYLOAD_SIZE 17
 
+#define CHANNEL_OFFSET 60
+
 using namespace libconfig;
 
 const char version[]           = "0.1";
