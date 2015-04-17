@@ -28,16 +28,29 @@ Neutrinoapp.ChartsController = Ember.ArrayController.extend({
 });
 
 function sanityCheckSetpoint(cap, controller, newsetpoint) {
+    console.log(cap);
+    console.log(controller);
+    console.log(newsetpoint);
     var mindiff = 4;
     var minheat = 50;
     var maxcool = 90;
     var maxhumidify = 50;
+    var coolpoint;
+    var heatpoint;
+    var allcaps = controller.get('capabilities');
+    for (i=0; i < allcaps.length; i++) {
+        console.log(allcaps[i]);
+        if (allcaps[i].capability == 'cool') {
+            coolpoint = allcaps[i].setpoint;
+        } else if (allcaps[i].capability == 'heat') {
+            heatpoint = allcaps[i].setpoint;
+        }
+    }
     if (cap.capability == 'heat') {
         if (newsetpoint < minheat) {
             alert('setpoint too low');
             return false;
         }
-        var coolpoint = parseInt($("#setpoint-" + controller.get('id') + "-cool").html());
         if (coolpoint != undefined && newsetpoint > (coolpoint - mindiff)) {
             alert('too close to cool point!');
             return false;
@@ -47,7 +60,6 @@ function sanityCheckSetpoint(cap, controller, newsetpoint) {
             alert('setpoint too high');
             return false;
         }
-        var heatpoint = parseInt($("#setpoint-" + controller.get('id') + "-heat").html());
         if (heatpoint != undefined && newsetpoint < (heatpoint + mindiff)) {
             alert('too close to heat point!');
             return false;
