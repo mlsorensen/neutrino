@@ -60,3 +60,11 @@ function sanityCheckSetpoint(cap, controller, newsetpoint) {
     }
     return true;
 }
+
+Neutrinoapp.SensorgroupSensorController = Ember.Controller.extend({
+    actions: {
+        logout: function() {
+            alert('logout');
+        }
+    }
+});

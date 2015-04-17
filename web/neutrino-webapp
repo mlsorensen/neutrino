@@ -83,6 +83,20 @@ get "/sensors" => sub {
     }
 };
 
+get "/sensorties" => sub {
+    my $self = shift;
+    my $dbh = _mysql_dbh($self, $config) or return;
+    my $sth = $dbh->prepare("SELECT id,sensor_id,sensorgroup_id from sensor_tie");
+    $sth->execute();
+    my $data = $sth->fetchall_arrayref({});
+    $sth->finish();
+    if (!$dbh->errstr()) {
+        $self->render(status => 200, json => { sensorties => $data });
+    } else {
+        $self->render(status => 500, json => { result => 0, payload => 'Database error occurred'});
+    }
+};
+
 del "/sensors/:address" => sub {
     my $self       = shift;
     my $address    = $self->param('address');

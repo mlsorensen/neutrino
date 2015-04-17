@@ -44,5 +44,5 @@ var opts = {
   top: '50%', // Top position relative to parent
   left: '50%' // Left position relative to parent
 };
-var target = document.getElementById('loader');
-var spinner = new Spinner(opts).spin(target);
+//var target = document.getElementById('loader');
+//var spinner = new Spinner(opts).spin(target);
