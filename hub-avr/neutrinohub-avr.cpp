@@ -13,6 +13,8 @@
 #define LEDPIN       6
 #define LEDCOUNT     12
 
+#define JSON_BUFFER_SIZE 128
+
 using namespace ArduinoJson::Generator;
 using namespace ArduinoJson::Parser;
 
@@ -65,34 +67,35 @@ void setup() {
 
     // startup animation
     int color[] = {0, 20, 90};
-    animate("dual_sweep_up",color);
-    animate("dual_sweep_down",color);
+    animate("smiley_face",color);
 }
 
 void loop() {
-    String msg;
+    char jsonmsg[JSON_BUFFER_SIZE]; 
+    int index = 0;
 
     // fetch json message
     if(Serial.available()) {
         while(1) {
             if(Serial.available()) {
-                char chr = Serial.read();
-                if (chr == '\r') {
+                char single = Serial.read();
+                if (single == '\r') {
                     break;
                 }
-                msg += chr;
+                jsonmsg[index] = single;
+                index++;
+                jsonmsg[index] = '\0';
+                if (index >= JSON_BUFFER_SIZE) {
+                    // this is an error, and just a sanity check that we don't buffer overflow
+                    break;
+                }
             }
         }
     }
 
-    // act on message
-    if (msg.length() > 0) {
-        char * cstr = new char [msg.length() + 1]();
-        strcpy(cstr, msg.c_str());
-
-        JsonParser<64> jsonparser;
-        
-        ArduinoJson::Parser::JsonObject incoming = jsonparser.parse(cstr);
+    if (sizeof(jsonmsg)) {
+        JsonParser<32> jsonparser;
+        ArduinoJson::Parser::JsonObject incoming = jsonparser.parse(jsonmsg);
 
         if (!incoming.success()) {
             ack(0,(const char*)"json failed to parse");
@@ -186,7 +189,6 @@ void loop() {
         }else {
             ack(0, (const char*)"got unknown msgtype");
         }
-        delete[] cstr;
     }
 }
 
@@ -486,7 +488,7 @@ bool update_relays() {
 }
 
 void ack(bool success, const char * msg) {
-    ArduinoJson::Generator::JsonObject<3> outgoing;
+    ArduinoJson::Generator::JsonObject<8> outgoing;
     outgoing["msgtype"] = "ack";
     outgoing["result"] = success;
     outgoing["detail"] = msg;
