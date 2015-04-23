@@ -11,12 +11,13 @@
   <body>
     <div id="loader"></div>
     <script type="text/x-handlebars" data-template-name="sensorgroup-sensor-modal">
-        {{#my-modal title='Sensor Group Members' close='removeModal'}}
-            <ul>
-            {{#each s in model}}
-                <li>{{s.display_name}}</li>
-            {{/each}}
-            </ul>
+        {{#my-modal title=model.display_name close='removeModal'}}
+            {{#each sensors itemController="sensorgroupItem"}}
+                <label>            
+                {{input type="checkbox" checked=selected}}
+                {{label}}
+                </label><br />
+            {{/each}} 
         {{/my-modal}}
     </script>
     <script type="text/x-handlebars">
@@ -96,7 +97,7 @@
                     </div>
                     <div id="collapse-sensorgroup-{{unbound sensorgroup.id}}" class="panel-collapse collapse">
                         <div class="panel-body">
-                            <button type="button" class="btn btn-default" {{action 'showModal' 'sensorgroup-sensor-modal' sensors sensorgroup}}>sensors</button>
+                            <button type="button" class="btn btn-default" {{action 'showModal' 'sensorgroup-sensor-modal' sensorgroup}}>sensors</button>
                         </div>
                         <div class="panel-body">
                             {{#if sensorgroup.controller_id}}

@@ -27,6 +27,12 @@ Neutrinoapp.ChartsController = Ember.ArrayController.extend({
   }.property('@each.dataset')
 });
 
+Neutrinoapp.SensorgroupItemController = Ember.ObjectController.extend({
+    selected: false,       
+    label: function() {return this.get('display_name')}.property(),
+    selectedChanged: false,
+});
+
 function sanityCheckSetpoint(cap, controller, newsetpoint) {
     console.log(cap);
     console.log(controller);

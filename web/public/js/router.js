@@ -3,6 +3,21 @@ Neutrinoapp.Router.map(function() {
 });
 
 Neutrinoapp.HomeRoute = Ember.Route.extend({
+    actions: {
+        showModal: function(name, model) {
+            this.render(name, {
+                into: 'application',
+                outlet: 'modal',
+                model: model
+            });
+        },
+        removeModal: function() {
+            this.disconnectOutlet({
+                outlet: 'modal',
+                parentView: 'application'
+            });
+        }
+    },
     model: function(){
         return Ember.RSVP.hash({
             "hvacControllers": this.store.find("hvaccontroller"),

@@ -17,23 +17,5 @@ Neutrinoapp.MyModalComponent = Ember.Component.extend({
   }.on('didInsertElement')
 });
 
-Neutrinoapp.ApplicationRoute = Ember.Route.extend({
-  actions: {
-    showModal: function(name, model) {
-      this.render(name, {
-        into: 'application',
-        outlet: 'modal',
-        model: model
-      });
-    },
-    removeModal: function() {
-      this.disconnectOutlet({
-        outlet: 'modal',
-        parentView: 'application'
-      });
-    }
-  }
-});
-
 var inflector = Ember.Inflector.inflector;
 inflector.uncountable('weather');
