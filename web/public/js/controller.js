@@ -41,9 +41,9 @@ function sanityCheckSetpoint(cap, controller, newsetpoint) {
     for (i=0; i < allcaps.length; i++) {
         console.log(allcaps[i]);
         if (allcaps[i].capability == 'cool') {
-            coolpoint = allcaps[i].setpoint;
+            coolpoint = parseInt(allcaps[i].setpoint);
         } else if (allcaps[i].capability == 'heat') {
-            heatpoint = allcaps[i].setpoint;
+            heatpoint = parseInt(allcaps[i].setpoint);
         }
     }
     if (cap.capability == 'heat') {
@@ -52,7 +52,7 @@ function sanityCheckSetpoint(cap, controller, newsetpoint) {
             return false;
         }
         if (coolpoint != undefined && newsetpoint > (coolpoint - mindiff)) {
-            alert('too close to cool point!');
+            alert(newsetpoint + ' too close to cool point' + coolpoint + '!');
             return false;
         }
     } else if (cap.capability == 'cool') {
@@ -60,8 +60,8 @@ function sanityCheckSetpoint(cap, controller, newsetpoint) {
             alert('setpoint too high');
             return false;
         }
-        if (heatpoint != undefined && newsetpoint < (heatpoint + mindiff)) {
-            alert('too close to heat point!');
+        if (heatpoint != undefined && coolpoint != undefined && newsetpoint < (heatpoint + mindiff)) {
+            alert(newsetpoint + ' too close to heat point ' + heatpoint + '!');
             return false;
         }
     } else if (cap.capability == 'humidify') {
