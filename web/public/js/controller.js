@@ -28,9 +28,20 @@ Neutrinoapp.ChartsController = Ember.ArrayController.extend({
 });
 
 Neutrinoapp.SensorgroupItemController = Ember.ObjectController.extend({
-    selected: false,       
+    selected: function() {return this.get('parentController.model.members').contains(this.get('content'))}.property(),      
     label: function() {return this.get('display_name')}.property(),
-    selectedChanged: false,
+    selectedChanged: function() {
+        var sensor = this.get('content');
+        var groupmembers = this.get('parentController.model.members');
+        if (this.get('selected')) {                                    
+            groupmembers.pushObject(sensor);            
+        } else {                                    
+            groupmembers.removeObject(sensor);                                                    
+        }        
+        this.get('parentController.model').save().catch(function() {
+            alert("failed to save sensor group");
+        });
+    }.observes('selected')
 });
 
 function sanityCheckSetpoint(cap, controller, newsetpoint) {

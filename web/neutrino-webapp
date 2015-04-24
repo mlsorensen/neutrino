@@ -397,6 +397,35 @@ get "/sensorgroups/:id" => sub {
     } 
 };
 
+# for ember
+put "/sensorgroups/:id" => sub {
+    my $self = shift;
+    my $id = $self->param('id');
+    my $validator  = Mojolicious::Validator->new;
+    my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
+
+    $validation->input({'id' => $id});
+    $validation->required('id')->like(qr/^\d+$/);;
+    if(! $validation->is_valid('id')) {
+        $self->render(status => 406, json => { result => 0, text => "id provided did not match character validation"} );
+        return;
+    }
+
+    my $dbh = _mysql_dbh($self, $config) or return;
+    $dbh->do("delete from sensor_tie where sensorgroup_id=?", undef, $id);
+    if (!$dbh->errstr()) {
+        my $members = $self->req->json->{sensorgroup}->{members};
+        foreach(@{$members}) {
+            $dbh->do("insert into sensor_tie (sensor_id, sensorgroup_id) values (?,?)", undef, $_, $id);
+            if ($dbh->errstr()) {
+                $self->render(status => 500, json => { result => 0, payload => 'Database error occurred'});
+            }
+        }
+        $self->render(status => 200, json => { result => 1, text => 'success' });
+    } else {
+        $self->render(status => 500, json => { result => 0, payload => 'Database error occurred'});
+    }
+};
 
 put "/sensorgroups" => sub {
     my $self       = shift;

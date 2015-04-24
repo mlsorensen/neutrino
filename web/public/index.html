@@ -12,7 +12,7 @@
     <div id="loader"></div>
     <script type="text/x-handlebars" data-template-name="sensorgroup-sensor-modal">
         {{#my-modal title=model.display_name close='removeModal'}}
-            {{#each sensors itemController="sensorgroupItem"}}
+            {{#each sensors itemController="sensorgroupItem" sensorgroup=model}}
                 <label>            
                 {{input type="checkbox" checked=selected}}
                 {{label}}
