@@ -27,15 +27,7 @@ Neutrinoapp.HomeController = Ember.Controller.extend({
             store.createRecord('sensorgroup', {
                 display_name:this.get("groupname")
             }).save().then(function(result) {
-                result.reload().then(function() {
-                    store.find('sensorgroup').then(function(groups) {
-                        groups.forEach(function(group) {
-                            if (group.get('id') == null) {
-                                group.deleteRecord();
-                            }
-                        });
-                    });
-                });
+                result.reload().then(function() {result.deleteRecord()});
             });
             this.set("groupname","");
         }
