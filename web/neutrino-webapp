@@ -83,6 +83,35 @@ get "/sensors" => sub {
     }
 };
 
+#for ember
+put "/sensors/:id" => sub {
+    my $self = shift;
+    my $id    = $self->param('id');
+    my $validator  = Mojolicious::Validator->new;
+    my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
+
+    $validation->input({'id' => $id});
+    $validation->required('id')->like(qr/^\d+$/);
+
+    if (! $validation->is_valid('id')) {
+        $self->render(status => 406, json => { result => 0, text => "data provided did not match character validation"} );
+        return;
+    }
+
+    my $displayname = $self->req->json->{sensor}->{display_name};
+    if ($displayname) {
+        my $dbh = _mysql_dbh($self, $config) or return;
+        $dbh->do("update sensor set display_name=? where id=?", undef, $displayname, $id);
+        if (!$dbh->errstr()) {
+            $self->render(status => 200, json => { result => 1, text => 'success' });
+        } else {
+            $self->render(status => 500, json => { result => 0, payload => 'Database error occurred'});
+        }
+    } else {
+        $self->render(status => 406, json => { result => 0, text => 'empty name provided'});
+    } 
+};
+
 get "/sensorties" => sub {
     my $self = shift;
     my $dbh = _mysql_dbh($self, $config) or return;

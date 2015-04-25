@@ -3,7 +3,7 @@ Neutrinoapp.ApplicationAdapter = DS.RESTAdapter.extend({
     namespace: 'api'
 });
 
-Neutrinoapp.MyModalComponent = Ember.Component.extend({
+Neutrinoapp.GenericModalComponent = Ember.Component.extend({
   actions: {
     ok: function() {
       this.$('.modal').modal('hide');

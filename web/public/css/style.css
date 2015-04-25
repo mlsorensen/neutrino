@@ -14,3 +14,8 @@
 
 .navbar-toggle {
 }
+
+ul
+{
+    list-style-type: none;
+}

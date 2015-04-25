@@ -11,14 +11,23 @@
   <body>
     <div id="loader"></div>
     <script type="text/x-handlebars" data-template-name="sensorgroup-sensor-modal">
-        {{#my-modal title=model.display_name close='removeModal'}}
+        {{#generic-modal title=model.display_name close='removeModal'}}
             {{#each sensors itemController="sensorgroupItem" sensorgroup=model}}
                 <label>            
                 {{input type="checkbox" checked=selected}}
                 {{label}}
                 </label><br />
             {{/each}} 
-        {{/my-modal}}
+        {{/generic-modal}}
+    </script>
+    <script type="text/x-handlebars" data-template-name="settings-sensor-modal">
+        {{#generic-modal title="Sensor Settings" close='removeModal'}}
+            <ul>
+            {{#each s in sensors}}
+                <li> #{{s.sensor_address}} {{input value=s.display_name action="updateSensorNames" on="focus-out"}}</li>
+            {{/each}} 
+            </ul>
+        {{/generic-modal}}
     </script>
     <script type="text/x-handlebars">
       {{outlet}}
@@ -43,41 +52,13 @@
                     {{/each}}
                 </div>
                 <div class="collapse navbar-collapse" id="navbar-collapse-1">
-<!--
-                    <ul class="nav navbar-nav">
-                        <li class="dropdown">
-                            <a href="#" class="dropdown-toggle" data-toggle="dropdown">Comfort <b class="caret"></b></a>
-                            <ul id="comfort-dropdown" class="dropdown-menu">
-                                <li><a id="comfort-home" href="#">Home</a></li>
-                                <li class="divider"></li>
-                                <li><a id="comfort-sensors" href="#">Sensors</a></li>
-                                <li class="divider"></li>
-                                <li><a id="comfort-sensor_groups" href="#">Sensor Groups</a></li>
-                            </ul>
-                        </li>
-                        <li class="dropdown">
-                            <a href="#" class="dropdown-toggle" data-toggle="dropdown">Camera <b class="caret"></b></a>
-                            <ul id="camera-dropdown" class="dropdown-menu">
-                                <li><a id="camera-comingsoon" href="#">Coming Soon!</a></li>
-                            </ul>
-                        </li>
-                        <li class="dropdown">
-                            <a href="#" class="dropdown-toggle" data-toggle="dropdown">Security <b class="caret"></b></a>
-                            <ul id="security-dropdown" class="dropdown-menu">
-                                <li><a id="security-comingsoon" href="#">Coming Soon!</a></li>
-                            </ul>
-                        </li>
-                    </ul>
-//-->
                     <ul class="nav navbar-nav navbar-right">
                         <li class="dropdown">
-                            <a href="#" class="dropdown-toggle" data-toggle="dropdown">Help <b class="caret"></b></a>
+                            <a href="#" class="dropdown-toggle" data-toggle="dropdown">Settings <b class="caret"></b></a>
                             <ul class="dropdown-menu">
-                                <li><a id="help-setup" href="#">Setup</a></li>
+                                <li><a id="settings-sensors" href="#" {{action 'showModal' 'settings-sensor-modal'}}>Sensors</a></li>
                                 <li class="divider"></li>
-                                <li><a id="help-about" href="#">About</a></li>
-                                <li class="divider"></li>
-                                <li><a id="help-electron14" href="http://electron14.com">electron14.com</a></li>
+                                <li><a id="settings-electron14" href="http://electron14.com">electron14.com</a></li>
                             </ul>
                         </li>
                     </ul>
@@ -139,7 +120,7 @@
             {{/each}}
         </div>
     </script>
-    <script type="text/x-handlebars" data-template-name="components/my-modal">
+    <script type="text/x-handlebars" data-template-name="components/generic-modal">
       <div class="modal fade">
         <div class="modal-dialog">
           <div class="modal-content">

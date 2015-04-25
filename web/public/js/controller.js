@@ -12,6 +12,15 @@ Neutrinoapp.HomeController = Ember.Controller.extend({
                     });
                 });
             }
+        },
+        updateSensorNames: function() {
+            this.store.find('sensor').then(function(sensors) {
+                sensors.forEach(function(sensor) {
+                    if (sensor.get("isDirty")) {
+                        sensor.save();
+                    }
+                });
+            });
         }
     },
     datasets: function() {
