@@ -21,6 +21,23 @@ Neutrinoapp.HomeController = Ember.Controller.extend({
                     }
                 });
             });
+        },
+        addSensorGroup: function() {
+            var store = this.store;
+            store.createRecord('sensorgroup', {
+                display_name:this.get("groupname")
+            }).save().then(function(result) {
+                result.reload().then(function() {
+                    store.find('sensorgroup').then(function(groups) {
+                        groups.forEach(function(group) {
+                            if (group.get('id') == null) {
+                                group.deleteRecord();
+                            }
+                        });
+                    });
+                });
+            });
+            this.set("groupname","");
         }
     },
     datasets: function() {

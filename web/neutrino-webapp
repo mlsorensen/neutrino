@@ -456,9 +456,10 @@ put "/sensorgroups/:id" => sub {
     }
 };
 
-put "/sensorgroups" => sub {
+# for ember
+post "/sensorgroups" => sub {
     my $self       = shift;
-    my $name       = $self->param('value');
+    my $name       = $self->req->json->{sensorgroup}->{display_name};
     my $validator  = Mojolicious::Validator->new;
     my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
 
