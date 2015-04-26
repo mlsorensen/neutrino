@@ -201,70 +201,6 @@ sub do_idle {
     set_controller_status($config,"idle");
 }
 
-#sub gpio_status {
-#    my $pin = shift;
-#    my $pindir = "/sys/class/gpio/gpio$pin";
-#
-#    lock($gpiolock);
-#    chomp(my $pinval = `cat $pindir/value`);
-#    return pinval;
-#}
-
-#sub gpio_off {
-#    my $pin = shift;
-#    my $pindir = "/sys/class/gpio/gpio$pin";
-#    
-#    lock($gpiolock);
-#    if (! -e $pindir) {
-#        # pin doesn't exist, can't be on
-#        return 1;
-#    } else {
-#        `echo 0 > $pindir/value`;
-#    }
-#}
-
-#sub gpio_off_delay {
-#    my $pin = shift;
-#    my $pindir = "/sys/class/gpio/gpio$pin";
-#
-#    if (! -e $pindir) {
-#        print ("delayed shutoff requested for pin $pin, but sysfs file doesn't exist. Ignoring request\n");
-#        return;
-#    }
-#
-#    my $thr = threads->create(sub {
-#        lock($fanlock);
-#        threads->detach();
-#        chomp (my $pinstate = `cat $pindir/value`);
-#        # do nothing if pin state is already off
-#        if ($pinstate == 0) {
-#            #print "delayed shutoff requested for pin that was already off, ignoring\n";
-#        } else {
-#            sleep 30;
-#            # do nothing if pin state has changed while we were sleeping
-#            lock($gpiolock);
-#            chomp (my $newpinstate = `cat $pindir/value`);
-#            if ( $pinstate == $newpinstate) {
-#                `echo 0 > $pindir/value`;
-#            }
-#        }
-#    });
-#}
-
-#sub gpio_on {
-#    my $pin = shift;
-#    my $pindir = "/sys/class/gpio/gpio$pin";
-#
-#    lock($gpiolock);
-#    if (! -e $pindir) {
-#        # pin doesn't exist, can't be on
-#        `echo $pin > /sys/class/gpio/export`;
-#        `echo out > $pindir/direction`;
-#    }
-#    
-#    `echo 1 > $pindir/value`;
-#}
-
 sub get_stats {
     my $config = shift;
 
@@ -281,7 +217,6 @@ sub get_stats {
         print "unable to get temperature preference from config, not fetching stats\n";
         return undef;
     }
-    #my $sth = $dbh->prepare("select avg($tempcol) as temperature, avg(data.humidity) as humidity from data,sensor_tie where sensor_tie.sensorgroup_id=? and date > (now() - 180) group by data.sensor_id;");
     my $sth = $dbh->prepare("select sensor_tie.sensorgroup_id, avg($tempcol) as temperature, avg(data.humidity) as humidity,avg(data.pascals)"
                                  . " as pressure from data,sensor_tie where sensor_tie.sensorgroup_id=? and data.sensor_id=sensor_tie.sensor_id "
                                  . " and date > (now() - 180) and data.pascals != 0 and humidity != 0 group by sensor_tie.sensorgroup_id;");
@@ -379,7 +314,6 @@ sub get_tempunits {
     }
 }
 
-# find controller in db, or add it if missing
 sub verify_controller {
     my $config = shift;
 
