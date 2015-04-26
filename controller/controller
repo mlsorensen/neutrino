@@ -386,16 +386,16 @@ sub verify_controller {
     if (get_controller_id($config)) {
         return 1;
     }
+    print("Added controller to database\n");
 
     my $dbh = _mysql_dbh($config) or return;
     $dbh->do("insert into controller (display_name) values (?)", undef, $config->{name});
     if ($dbh->errstr()) {
         die ("Error inserting controller: " . $dbh->errstr() . "\n");
     } else {
-        my $controllerid = get_controller_id($config);
-        if ($controllerid) {
+        if (get_controller_id($config)) {
             foreach my $capability( @{$config->{capabilities}}) {
-                $dbh->do("insert into controller_capabilities (controller_id, capability) values (?, ?)", undef, $controllerid, $capability);
+                $dbh->do("insert into controller_capabilities (controller_id, capability) values (?, ?)", undef, $config->{id}, $capability);
             }
             return 1;
         } 
@@ -445,7 +445,7 @@ EOF
 
 sub _mysql_dbh {
     my $config = shift;
-    my $dbh    = DBI->connect("DBI:mysql:database=$config->{mysqldb}:host=$config->{mysqlserver}:port=3306",
+    my $dbh    = DBI->connect("DBI:mysql:database=$config->{mysqldb}:host=$config->{mysqlhost}:port=3306",
                            $config->{mysqluser},$config->{mysqlpass})
                       or print "Failed database connection\n" and return 0;
     return $dbh;
