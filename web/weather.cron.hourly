@@ -1,0 +1,64 @@
+#!/usr/bin/env perl
+use strict;
+use DateTime;
+use Data::Dumper;
+use DBI;
+use Fcntl qw(:flock SEEK_END);
+use File::stat;
+use JSON;
+use Mojo::UserAgent;
+
+my $weatherfile = "/dev/shm/weather";
+
+my $location = getLocation();
+if (!$location) {
+    print "unable to find location\n";
+    exit;
+}
+print "Fetching weather for $location\n";
+my $weather;
+foreach (0..9) {
+    $weather = getWeather($location);
+    if ($weather ne "failure") {
+        last;
+    }
+    sleep 10;
+}
+print "Saving weather to $weatherfile\n";
+open(FILE, ">$weatherfile") or die $^E;
+flock(FILE, LOCK_EX);
+print FILE encode_json($weather);
+close(FILE);
+
+sub getWeather {
+    my $location = shift;
+    my $ua = Mojo::UserAgent->new();
+    $ua->max_redirects(0)->connect_timeout(6)->request_timeout(10);
+    my $tx = $ua->get("http://api.openweathermap.org/data/2.5/weather?q=$location" => {DNT => 1});
+    if (my $res = $tx->success) {
+        my $weather = $res->json;
+        my $response = {};
+        $response->{id} = 1;
+        $response->{humidity} = $weather->{main}->{humidity};
+        $response->{fahrenheit} = sprintf("%.1f",$weather->{main}->{temp} * 1.8 - 459.67);
+        $response->{celsius} = sprintf("%.1f",$weather->{main}->{temp} - 273.15);
+        $response->{location} = $weather->{name};
+        $response->{description} = $weather->{weather}->[0]->{main};
+        $response->{icon} = "http://openweathermap.org/img/w/" . $weather->{weather}->[0]->{icon} . ".png";
+        return $response;
+    } else {
+        return "failure";
+    }
+}
+
+sub getLocation {
+    my $ua = Mojo::UserAgent->new();
+    $ua->max_redirects(0)->connect_timeout(6)->request_timeout(10);
+    my $tx = $ua->get("http://localhost/api/config/location" => {DNT => 1});
+    if (my $res = $tx->success) {
+        return $res->json->{payload}->{value};
+    }
+    print "unable to fetch location from api:\n";
+    print Dumper $tx->error;
+    exit;
+}

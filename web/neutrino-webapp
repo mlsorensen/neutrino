@@ -6,9 +6,13 @@ use Mojo::UserAgent;
 use DateTime;
 use Data::Dumper;
 use DBI;
+use Fcntl qw(:flock SEEK_END);
+use File::stat;
+use JSON;
 
 my $config  = plugin 'Config';
 my $appname = "Neutrino";
+my $weatherfile = "/dev/shm/weather";
 my $version = "0.1";
 
 get "/" => sub {
@@ -40,6 +44,15 @@ get "/date" => sub {
 
 get "/weather" => sub {
     my $self = shift;
+    if (-e $weatherfile && stat($weatherfile)->mtime - 3600 > time) {
+        open(FILE, "<$weatherfile");
+        flock(FILE, LOCK_SH);
+        my $weather = decode_json(<FILE>);
+        flock(FILE, LOCK_UN);
+        close(FILE);
+        $self->render(json => { weather => [$weather]});
+        return;
+    }
     my $dbh  = _mysql_dbh($self, $config) or return;
     my $sth  = $dbh->prepare("SELECT value from configuration where name='location'");
     $sth->execute();
