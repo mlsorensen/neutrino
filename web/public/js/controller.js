@@ -30,6 +30,13 @@ Neutrinoapp.HomeController = Ember.Controller.extend({
                 result.reload().then(function() {result.deleteRecord()});
             });
             this.set("groupname","");
+        },
+        deleteSensorGroup: function(group) {
+            group.deleteRecord();
+            group.save().catch(function(result) {
+                group.rollback();
+                alert(result.responseJSON.text);
+            });
         }
     },
     datasets: function() {

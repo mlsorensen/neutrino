@@ -91,6 +91,7 @@
                     <div id="collapse-sensorgroup-{{unbound sensorgroup.id}}" class="panel-collapse collapse">
                         <div class="panel-body">
                             <button type="button" class="btn btn-default" {{action 'showModal' 'sensorgroup-sensor-modal' sensorgroup}}>sensors</button>
+                            <button type="button" class="btn btn-danger" style="float:right" {{action 'deleteSensorGroup' sensorgroup}}>delete</button>
                         </div>
                         <div class="panel-body">
                             {{#if sensorgroup.controller_id}}

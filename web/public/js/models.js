@@ -9,7 +9,9 @@ Neutrinoapp.Weather = DS.Model.extend({
     didLoad: function() {
         var self = this;
         setInterval(function() {
-            self.reload();
+            if (!self.get('isDeleted')) {
+                self.reload();
+            }
         }, 300000);
     }
 });
@@ -30,7 +32,9 @@ Neutrinoapp.Sensorgroup = DS.Model.extend({
     didLoad: function() {
         var self = this;
         setInterval(function() {
-            self.reload();
+            if (!self.get('isDeleted')) {
+                self.reload();
+            }
         },30000);
     }
 });
@@ -51,7 +55,9 @@ Neutrinoapp.Hvaccontroller = DS.Model.extend({
     didLoad: function() {
         var self = this;
         setInterval(function() {
-            self.reload();
+            if (!self.get('isDeleted')) {
+                self.reload();
+            }
         },10000);
     }
 });
@@ -67,7 +73,9 @@ Neutrinoapp.Sensorstat = DS.Model.extend({
     didLoad: function() {
         var self = this;
         setInterval(function() {
-            self.reload();
+            if (!self.get('isDeleted')) {
+                self.reload();
+            }
         },30000);
     }
 });
