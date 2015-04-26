@@ -24,7 +24,7 @@
         {{#generic-modal title="Sensor Settings" close='removeModal'}}
             <ul>
             {{#each s in sensors}}
-                <li> #{{s.sensor_address}} {{input value=s.display_name action="updateSensorNames" on="focus-out"}}</li>
+                <li>Channel #{{s.sensor_hub_id}} Addr #{{s.sensor_address}} {{input value=s.display_name action="updateSensorNames" on="focus-out"}}</li>
             {{/each}} 
             </ul>
         {{/generic-modal}}
@@ -90,7 +90,7 @@
                     </div>
                     <div id="collapse-sensorgroup-{{unbound sensorgroup.id}}" class="panel-collapse collapse">
                         <div class="panel-body">
-                            <button type="button" class="btn btn-default" {{action 'showModal' 'sensorgroup-sensor-modal' sensorgroup}}>sensors</button>
+                            <button type="button" class="btn btn-primary" {{action 'showModal' 'sensorgroup-sensor-modal' sensorgroup}}>sensors</button>
                             <button type="button" class="btn btn-danger" style="float:right" {{action 'deleteSensorGroup' sensorgroup}}>delete</button>
                         </div>
                         <div class="panel-body">
