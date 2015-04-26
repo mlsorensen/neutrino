@@ -16,7 +16,8 @@ SPIClass SPI;
 void SPIClass::begin() {
 
   // Set SS to high so a connected chip will be "deselected" by default
-  digitalWrite(SS, HIGH);
+    // we actually set this low, because neutrino doesn't use SS and we reuse the pin as CHANNEL_BIT_0
+  digitalWrite(SS, LOW);
 
   // When the SS pin is set as OUTPUT, it can be used as
   // a general purpose output port (it doesn't influence
