@@ -329,7 +329,15 @@ sub verify_controller {
     } else {
         if (get_controller_id($config)) {
             foreach my $capability( @{$config->{capabilities}}) {
-                $dbh->do("insert into controller_capabilities (controller_id, capability) values (?, ?)", undef, $config->{id}, $capability);
+                $defaultsetpoint = 0;
+                if ($capability eq 'heat') {
+                    $defaultsetpoint = 80;
+                } elsif ($capability eq 'cool') {
+                    $defaultsetpoint = 60;
+                } elsif ($capability eq 'humidify') {
+                    $defaultsetpoint = 20;
+                }
+                $dbh->do("insert into controller_capabilities (controller_id, capability, setpoint) values (?, ?, ?)", undef, $config->{id}, $capability, $defaultsetpoint);
             }
             return 1;
         } 
