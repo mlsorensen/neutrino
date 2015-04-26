@@ -82,6 +82,46 @@ get "/weather" => sub {
     }
 };
 
+get "/weather/:id" => sub {
+    my $self = shift;
+    if (-e $weatherfile && stat($weatherfile)->mtime - 3600 > time) {
+        open(FILE, "<$weatherfile");
+        flock(FILE, LOCK_SH);
+        my $weather = decode_json(<FILE>);
+        flock(FILE, LOCK_UN);
+        close(FILE);
+        $self->render(json => { weather => [$weather]});
+        return;
+    }
+    my $dbh  = _mysql_dbh($self, $config) or return;
+    my $sth  = $dbh->prepare("SELECT value from configuration where name='location'");
+    $sth->execute();
+    my $row  = $sth->fetchrow_hashref();
+    $sth->finish();
+    if (exists $row->{value}) {
+        my $ua = Mojo::UserAgent->new();
+        $ua->max_redirects(0)->connect_timeout(6)->request_timeout(10);
+        my $tx = $ua->get("http://api.openweathermap.org/data/2.5/weather?q=$row->{value}" => {DNT => 1});
+        if (my $res = $tx->success) {
+            my $weather = $res->json;
+            my $response = {};
+            $response->{id} = 1;
+            $response->{humidity} = $weather->{main}->{humidity};
+            $response->{fahrenheit} = sprintf("%.1f",$weather->{main}->{temp} * 1.8 - 459.67);
+            $response->{celsius} = sprintf("%.1f",$weather->{main}->{temp} - 273.15);
+            $response->{location} = $weather->{name};
+            $response->{description} = $weather->{weather}->[0]->{main};
+            $response->{icon} = "http://openweathermap.org/img/w/" . $weather->{weather}->[0]->{icon} . ".png";
+            $self->render(json => { weather => [$response]});
+        } else {
+            my $err = $tx->error;
+            $self->render(json => { result => 0, text => 'Unable to fetch weather from openweathermap.org' }, status => $err->{code});
+        }
+    } else {
+        $self->render(json => { result => 0, text => 'no location config found, no weather queried' }, status => 404);
+    }
+};
+
 get "/sensors" => sub {
     my $self = shift;
     my $dbh  = _mysql_dbh($self, $config) or return;
