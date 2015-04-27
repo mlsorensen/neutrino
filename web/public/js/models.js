@@ -52,6 +52,7 @@ Neutrinoapp.Hvaccontroller = DS.Model.extend({
     display_name: DS.attr('string'),
     enabled: DS.attr('boolean'),
     capabilities: DS.attr('raw'),
+    sensorgroup_id: DS.belongsTo('sensorgroup', {async:true}),
     didLoad: function() {
         var self = this;
         setInterval(function() {

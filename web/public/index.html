@@ -25,7 +25,9 @@
             <div class="btn-group-vertical" role="group">
                 <button type="button" class="btn btn-default" {{action 'setControllerSensorGroup' model}}>None</button>
                 {{#each c in hvacControllers}}
-                <button type="button" class="btn btn-default" {{action 'setControllerSensorGroup' model c}}>{{c.display_name}}</button>
+                {{#unless c.sensorgroup_id}}
+                    <button type="button" class="btn btn-default" {{action 'setControllerSensorGroup' model c}}>{{c.display_name}}</button>
+                {{/unless}}
                 {{/each}}
             </div>
         {{/generic-modal}}
@@ -100,9 +102,9 @@
                     </div>
                     <div id="collapse-sensorgroup-{{unbound sensorgroup.id}}" class="panel-collapse collapse">
                         <div class="panel-body">
-                            <button type="button" class="btn btn-primary col-xs-2 col-md-1 hmargin-5" {{action 'showModal' 'sensorgroup-sensor-modal' sensorgroup}}>sensors</button>
-                            <button type="button" class="btn btn-primary col-xs-2 col-md-1 hmargin-5" {{action 'showModal' 'sensorgroup-controller-modal' sensorgroup}}>controller</button>
-                            <button type="button" class="btn btn-danger col-xs-2 col-md-1 hmargin-5 pull-right" {{action 'deleteSensorGroup' sensorgroup}}>delete</button>
+                            <button type="button" class="btn btn-primary col-xs-3 col-md-1 hmargin-5" {{action 'showModal' 'sensorgroup-sensor-modal' sensorgroup}}>sensors</button>
+                            <button type="button" class="btn btn-primary col-xs-3 col-md-1 hmargin-5" {{action 'showModal' 'sensorgroup-controller-modal' sensorgroup}}>controller</button>
+                            <button type="button" class="btn btn-danger col-xs-3 col-md-1 hmargin-5 pull-right" {{action 'deleteSensorGroup' sensorgroup}}>delete</button>
                         </div>
                         <div class="panel-body">
                             {{#if sensorgroup.controller_id}}

@@ -214,10 +214,11 @@ del "/sensors/:address" => sub {
     }
 };
 
+# for ember
 get "/hvaccontrollers" => sub {
     my $self = shift;
     my $dbh  = _mysql_dbh($self, $config) or return;
-    my $sth  = $dbh->prepare("SELECT * from controller");
+    my $sth  = $dbh->prepare("select controller.id,controller.display_name,enabled,status,fan_mode,sensorgroup.id as sensorgroup_id from controller,sensorgroup where controller.id=sensorgroup.controller_id;");
     $sth->execute();
     my $data = $sth->fetchall_arrayref({});
     $sth->finish();
@@ -234,6 +235,7 @@ get "/hvaccontrollers" => sub {
     }
 };
 
+#for ember
 get "/hvaccontrollers/:id" => sub {
     my $self = shift;
     my $id = $self->param('id');
@@ -244,7 +246,7 @@ get "/hvaccontrollers/:id" => sub {
     $validation->required('id')->like(qr/^\d+$/);
 
     my $dbh  = _mysql_dbh($self, $config) or return;
-    my $sth  = $dbh->prepare("SELECT * from controller where id=?");
+    my $sth  = $dbh->prepare("select controller.id,controller.display_name,enabled,status,fan_mode,sensorgroup.id as sensorgroup_id from controller,sensorgroup where controller.id=sensorgroup.controller_id and controller.id=?");
     $sth->execute($id);
     my $data = $sth->fetchall_arrayref({});
     $sth->finish();

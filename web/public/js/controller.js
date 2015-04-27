@@ -77,6 +77,10 @@ Neutrinoapp.SensorgroupItemController = Ember.ObjectController.extend({
     }.observes('selected')
 });
 
+Neutrinoapp.SetcontrollerItemController = Ember.ObjectController.extend({
+    label: function() {return "btn btn-default"}.property()
+});
+
 function sanityCheckSetpoint(cap, controller, newsetpoint) {
     console.log(cap);
     console.log(controller);
