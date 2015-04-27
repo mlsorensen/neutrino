@@ -44,7 +44,7 @@ get "/date" => sub {
 
 get "/weather" => sub {
     my $self = shift;
-    if (-e $weatherfile && stat($weatherfile)->mtime - 3600 > time) {
+    if (-e $weatherfile) {
         open(FILE, "<$weatherfile");
         flock(FILE, LOCK_SH);
         my $weather = decode_json(<FILE>);
@@ -84,7 +84,7 @@ get "/weather" => sub {
 
 get "/weather/:id" => sub {
     my $self = shift;
-    if (-e $weatherfile && stat($weatherfile)->mtime - 3600 > time) {
+    if (-e $weatherfile) {
         open(FILE, "<$weatherfile");
         flock(FILE, LOCK_SH);
         my $weather = decode_json(<FILE>);
@@ -501,7 +501,18 @@ put "/sensorgroups/:id" => sub {
             $dbh->do("insert into sensor_tie (sensor_id, sensorgroup_id) values (?,?)", undef, $_, $id);
             if ($dbh->errstr()) {
                 $self->render(status => 500, json => { result => 0, payload => 'Database error occurred'});
+                return;
             }
+        }
+        my $controller = $self->req->json->{sensorgroup}->{controller_id};
+        $dbh->do("update sensorgroup set controller_id=? where id=?", undef, $controller, $id);
+        if ($dbh->errstr()) {
+            if ($dbh->errstr() =~ /duplicate/i) {
+                $self->render(status => 500, json => { result => 0, payload => "Controller is in use!"});
+            } else {
+                $self->render(status => 500, json => { result => 0, payload => $dbh->errstr()});
+            }
+            return; 
         }
         $self->render(status => 200, json => { result => 1, text => 'success' });
     } else {

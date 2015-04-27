@@ -6,6 +6,7 @@ Neutrinoapp.HvaccontrollerenabledView = Ember.Checkbox.extend({
          $("#loader").remove();
     },
     save: function() {
+        if (this.ctrlr.get('store') == null) { return };
         this.ctrlr.get('store').find('hvaccontroller',this.ctrlr.get('id')).then(function(thing) {
             if (!this.failed) {
                 thing.save().catch(function() {

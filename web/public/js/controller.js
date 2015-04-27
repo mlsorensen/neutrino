@@ -37,6 +37,14 @@ Neutrinoapp.HomeController = Ember.Controller.extend({
                 group.rollback();
                 alert(result.responseJSON.text);
             });
+        },
+        setControllerSensorGroup: function(group, controller) {
+            var oldcontroller = group.get("controller_id");
+            group.set("controller_id", controller);
+            group.save().catch(function(result) {
+                group.set("controller_id", oldcontroller);
+                alert(result.responseJSON.payload);
+            });
         }
     },
     datasets: function() {
