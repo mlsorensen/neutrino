@@ -25,6 +25,7 @@ Neutrinoapp.HomeRoute = Ember.Route.extend({
             "sensorStats": this.store.find("sensorstat"),
             "sensors" : this.store.find("sensor"),
             "weather" : this.store.find("weather"),
+            "configuration" : this.store.find("configuration"),
             "statStrings": ["fahrenheit","humidity","voltage"]
         });
     },
@@ -35,6 +36,7 @@ Neutrinoapp.HomeRoute = Ember.Route.extend({
         controller.set('hvacControllers', model.hvacControllers);
         controller.set('sensorGroups', model.sensorGroups);
         controller.set('statStrings', model.statStrings);
+        controller.set('configuration', model.configuration);
     }
 });
 

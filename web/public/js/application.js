@@ -19,3 +19,4 @@ Neutrinoapp.GenericModalComponent = Ember.Component.extend({
 
 var inflector = Ember.Inflector.inflector;
 inflector.uncountable('weather');
+inflector.uncountable('configuration');

@@ -16,6 +16,11 @@ Neutrinoapp.Weather = DS.Model.extend({
     }
 });
 
+Neutrinoapp.Configuration = DS.Model.extend({
+    value : DS.attr('string'),
+    name : DS.attr('string')
+});
+
 Neutrinoapp.Sensor = DS.Model.extend({
     sensor_hub_id : DS.attr('number'),
     sensor_address : DS.attr('number'),

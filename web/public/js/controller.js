@@ -22,6 +22,15 @@ Neutrinoapp.HomeController = Ember.Controller.extend({
                 });
             });
         },
+        updateConfiguration: function() {
+            this.store.find('configuration').then(function(configs) {
+                configs.forEach(function(config) {
+                    if (config.get("isDirty")) {
+                        config.save();
+                    }
+                });
+            });
+        },
         addSensorGroup: function() {
             var store = this.store;
             store.createRecord('sensorgroup', {

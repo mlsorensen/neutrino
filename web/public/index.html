@@ -41,6 +41,15 @@
             </ul>
         {{/generic-modal}}
     </script>
+    <script type="text/x-handlebars" data-template-name="settings-config-modal">
+        {{#generic-modal title="Configuration" close='removeModal'}}
+            <ul>
+            {{#each c in configuration}}
+                <li>{{c.name}} {{input value=c.value action="updateConfiguration" on="focus-out"}}</li>
+            {{/each}}
+            </ul>
+        {{/generic-modal}}
+    </script>
     <script type="text/x-handlebars" data-template-name="settings-sensorgroup-modal">
         {{#generic-modal title="Add Sensor Group" close='removeModal'}}
             <form {{action "addSensorGroup" on="submit"}}>
@@ -81,6 +90,8 @@
                                 <li><a id="settings-sensors" href="#" {{action 'showModal' 'settings-sensor-modal'}}>Sensors</a></li>
                                 <li class="divider"></li>
                                 <li><a id="settings-sensorgroups" href="#" {{action 'showModal' 'settings-sensorgroup-modal'}}>Add Sensor Group</a></li>
+                                <li class="divider"></li>
+                                <li><a id="settings-config" href="#" {{action 'showModal' 'settings-config-modal'}}>Configuration</a></li>
                                 <li class="divider"></li>
                                 <li><a id="settings-electron14" href="http://electron14.com">electron14.com</a></li>
                             </ul>

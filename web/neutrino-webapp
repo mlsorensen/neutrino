@@ -735,7 +735,7 @@ get "/sensorstats/:id" => sub {
     my $sensors = $sth->fetchall_arrayref({});
     
     my $response = {};
-        $sth = $dbh->prepare("SELECT UNIX_TIMESTAMP(date)*1000 as date,$stringquery from data where sensor_id=? and date >= DATE_SUB(NOW(),INTERVAL 1 HOUR)");
+        $sth = $dbh->prepare("SELECT UNIX_TIMESTAMP(date)*1000 as date,$stringquery from data where sensor_id=? and date >= DATE_SUB(NOW(),INTERVAL (select value from configuration where name='graphtime') HOUR)");
         $sth->execute($sensorid);
         my $data = $sth->fetchall_arrayref({});
         my $sensorstats;
@@ -762,8 +762,7 @@ get "/sensorstats" => sub {
     
     my $response = {};
     foreach my $sensor(@{$sensors}) {
-        #$sth = $dbh->prepare("SELECT date,$stringquery from data,sensor where sensor.id=data.sensor_id and sensor.sensor_address=? and date >= DATE_SUB(NOW(),INTERVAL 1 HOUR)");
-        $sth = $dbh->prepare("SELECT UNIX_TIMESTAMP(date)*1000 as date,$stringquery from data where sensor_id=? and date >= DATE_SUB(NOW(),INTERVAL 1 HOUR)");
+        $sth = $dbh->prepare("SELECT UNIX_TIMESTAMP(date)*1000 as date,$stringquery from data where sensor_id=? and date >= DATE_SUB(NOW(),INTERVAL (select value from configuration where name='graphtime') HOUR)");
         $sth->execute($sensor->{id});
         my $data = $sth->fetchall_arrayref({});
         my $sensorstats;
@@ -801,32 +800,65 @@ post "/sensors/:address/name" => sub {
     $self->render(status => 200, json => { result => 1, text => 'success' });
 };
 
-get "/config" => sub {
+#ember
+get "/configuration" => sub {
     my $self = shift;
     my $dbh = _mysql_dbh($self, $config) or return;
-    my $sth = $dbh->prepare("SELECT name,value from configuration");
+    my $sth = $dbh->prepare("SELECT id,name,value from configuration");
     $sth->execute();
-    my $data = $sth->fetchall_hashref('name');
+    my $data = $sth->fetchall_arrayref({});
     $sth->finish();
-    $self->render(json => { result => 1, payload => $data});
-};
-
-get "/config/:key" => sub {
-    my $self = shift;
-    my $key = $self->param('key');
-    my $dbh = _mysql_dbh($self, $config) or return;
-    my $sth = $dbh->prepare("SELECT value from configuration where name='$key'");
-    $sth->execute();
-    my $row = $sth->fetchrow_hashref();
-    $sth->finish();
-    if (exists $row->{value}) {
-        $self->render(json => { result => 1, payload => $row});
+    if (!$dbh->errstr()) {
+        $self->render(status => 200, json => { configurations => $data });
     } else {
-        $self->render(json => { result => 0, text => 'no config found' }, status => 404);
+        $self->render(status => 500, json => { result => 0, payload => 'Database error occurred'});
     }
 };
 
-post "/config/:key" => sub {
+#ember
+get "/configuration/:id" => sub {
+    my $self = shift;
+    my $id = $self->param('id');
+    my $dbh = _mysql_dbh($self, $config) or return;
+    my $sth = $dbh->prepare("SELECT id,name,value from configuration where id=?");
+    $sth->execute($id);
+    my $data = $sth->fetchrow_arrayref({});
+    $sth->finish();
+    if (!$dbh->errstr()) {
+        $self->render(status => 200, json => { configurations => $data });
+    } else {
+        $self->render(status => 500, json => { result => 0, payload => 'Database error occurred'});
+    }
+};
+
+put "/configuration/:id" => sub {
+    my $self = shift;
+    my $id    = $self->param('id');
+    my $validator  = Mojolicious::Validator->new;
+    my $validation = Mojolicious::Validator::Validation->new(validator => $validator);
+
+    $validation->input({'id' => $id});
+    $validation->required('id')->like(qr/^\d+$/);
+
+    if (! $validation->is_valid('id')) {
+        $self->render(status => 406, json => { result => 0, text => "data provided did not match character validation"} );
+        return;
+    }
+    my $name = $self->req->json->{configuration}->{name};
+    my $value = $self->req->json->{configuration}->{value};
+    my $dbh = _mysql_dbh($self, $config) or return;
+    if ($name and $value) {
+        $dbh->do("update configuration set name=?,value=? where id=?", undef, $name, $value, $id);
+        if (!$dbh->errstr()) {
+            $self->render(status => 200, json => { result => 1, text => 'success' });
+        } else {
+            $self->render(status => 500, json => { result => 0, payload => 'Database error occurred'});
+        }
+    }
+    $self->render(status => 406, json => { result => 0, text => 'empty name or value provided'});
+};
+
+post "/configuration/:key" => sub {
     my $self       = shift;
     my $key        = $self->param('key');
     my $value      = $self->param('value');
