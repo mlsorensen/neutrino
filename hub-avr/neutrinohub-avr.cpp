@@ -160,7 +160,7 @@ void loop() {
                     relaystates.cool2    = 0;
                     update_relays();
                     relaystates.fan      = 0;
-                    delay(30000);
+                    delay(60000);
                     update_relays();
                     ack(1, (const char*)"idling, wait 30 seconds");
                 }
