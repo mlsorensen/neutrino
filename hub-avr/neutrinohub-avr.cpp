@@ -68,6 +68,9 @@ void setup() {
     // startup animation
     int color[] = {0, 20, 90};
     animate("smiley_face",color);
+    blank_ledcolors();
+    delay(1000);
+    render_leds();
 }
 
 void loop() {
