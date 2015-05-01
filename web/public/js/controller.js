@@ -94,7 +94,7 @@ function sanityCheckSetpoint(cap, controller, newsetpoint) {
     console.log(cap);
     console.log(controller);
     console.log(newsetpoint);
-    var mindiff = 4;
+    var mindiff = 3;
     var minheat = 50;
     var maxcool = 90;
     var maxhumidify = 50;
