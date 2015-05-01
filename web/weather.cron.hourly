@@ -54,9 +54,13 @@ sub getWeather {
 sub getLocation {
     my $ua = Mojo::UserAgent->new();
     $ua->max_redirects(0)->connect_timeout(6)->request_timeout(10);
-    my $tx = $ua->get("http://localhost/api/config/location" => {DNT => 1});
+    my $tx = $ua->get("http://localhost/api/configuration" => {DNT => 1});
     if (my $res = $tx->success) {
-        return $res->json->{payload}->{value};
+        foreach my $item (@{$res->json->{configurations}}) {
+	    if ($item->{name} == "location") {
+		return $item->{value};
+	    }
+	}
     }
     print "unable to fetch location from api:\n";
     print Dumper $tx->error;
