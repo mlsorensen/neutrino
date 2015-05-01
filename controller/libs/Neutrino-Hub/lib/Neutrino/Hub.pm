@@ -211,16 +211,17 @@ sub recv_msg {
     }
 
     my $jsonmsg;
-    open(PORT, "<$self->{serial_port}");
+    my $port;
     eval {
         local $SIG{ALRM} = sub { die "DEBUG: recv_msg: Failed in FLOCK of $self->{serial_port}" };
         alarm 30;
-        flock(PORT, LOCK_EX);
-        $jsonmsg = <PORT>;
+	open($port, "<$self->{serial_port}");
+        flock($port, LOCK_EX);
+        $jsonmsg = <$port>;
         alarm 0;
     };
     print $@ if $@;
-    close PORT;
+    close $port;
     if ($self->{settings}->{debug}) {
         print "DEBUG: recv_msg: got $jsonmsg";
     }
