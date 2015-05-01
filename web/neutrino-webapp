@@ -17,7 +17,7 @@ my $version = "0.1";
 
 get "/" => sub {
     my $self = shift;
-    $self->render("index.html");
+    $self->redirect_to("index.html");
 };
 
 get "/help-about.html" => {appname => $appname, version => $version} => sub {
