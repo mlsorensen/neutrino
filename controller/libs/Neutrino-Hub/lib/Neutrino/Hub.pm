@@ -190,7 +190,7 @@ sub send_msg {
     open(PORT, ">$self->{serial_port}");
     eval {
         local $SIG{ALRM} = sub { die "DEBUG: send_msg: Failed in FLOCK of $self->{serial_port}" };
-        alarm 30;
+        alarm 65;
         flock(PORT, LOCK_EX);
         print PORT $msg;
         alarm 0;
