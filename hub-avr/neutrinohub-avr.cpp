@@ -162,10 +162,10 @@ void loop() {
                     relaystates.heat2    = 0;
                     relaystates.cool2    = 0;
                     update_relays();
-                    relaystates.fan      = 0;
                     delay(60000);
+                    ack(1, (const char*)"idling, waited 60 seconds");
+                    relaystates.fan      = 0;
                     update_relays();
-                    ack(1, (const char*)"idling, wait 30 seconds");
                 }
             } else {
                 ack(0, (const char*)"provided unknown relay state");
