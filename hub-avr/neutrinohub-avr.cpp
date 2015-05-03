@@ -75,6 +75,7 @@ void setup() {
 
 void loop() {
     char jsonmsg[JSON_BUFFER_SIZE]; 
+    jsonmsg[0] = '\0';
     int index = 0;
 
     // fetch json message
@@ -96,7 +97,7 @@ void loop() {
         }
     }
 
-    if (sizeof(jsonmsg)) {
+    if (jsonmsg[0] != '\0') {
         JsonParser<32> jsonparser;
         ArduinoJson::Parser::JsonObject incoming = jsonparser.parse(jsonmsg);
 

@@ -214,7 +214,7 @@ sub recv_msg {
     my $port;
     eval {
         local $SIG{ALRM} = sub { die "DEBUG: recv_msg: Failed in FLOCK of $self->{serial_port}" };
-        alarm 30;
+        alarm 65;
 	open($port, "<$self->{serial_port}");
         flock($port, LOCK_EX);
         $jsonmsg = <$port>;
