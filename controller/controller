@@ -331,9 +331,9 @@ sub verify_controller {
             foreach my $capability( @{$config->{capabilities}}) {
                 $defaultsetpoint = 0;
                 if ($capability eq 'heat') {
-                    $defaultsetpoint = 80;
-                } elsif ($capability eq 'cool') {
                     $defaultsetpoint = 60;
+                } elsif ($capability eq 'cool') {
+                    $defaultsetpoint = 80;
                 } elsif ($capability eq 'humidify') {
                     $defaultsetpoint = 20;
                 }

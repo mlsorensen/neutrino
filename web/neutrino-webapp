@@ -218,7 +218,7 @@ del "/sensors/:address" => sub {
 get "/hvaccontrollers" => sub {
     my $self = shift;
     my $dbh  = _mysql_dbh($self, $config) or return;
-    my $sth  = $dbh->prepare("select controller.id,controller.display_name,enabled,status,fan_mode,sensorgroup.id as sensorgroup_id from controller,sensorgroup where controller.id=sensorgroup.controller_id;");
+    my $sth = $dbh->prepare("select controller.id,controller.display_name,enabled,status,fan_mode,sensorgroup.id as sensorgroup_id from controller left join sensorgroup on controller.id=sensorgroup.controller_id;");
     $sth->execute();
     my $data = $sth->fetchall_arrayref({});
     $sth->finish();
