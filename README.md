@@ -35,3 +35,31 @@ arduino: This is the code that runs on the sensor microcontrollers. It also cont
 controller: This will be the software that controls the controller
 
 web: This will be the UI code
+
+#### DEPLOYMENT
+
+Deployment is currently ad-hoc, but the following may help.
+
+Running the sensor hub:
+
+    $ sudo apt-get install daemon
+    $ cd ~/neutrino/hub
+    $ sudo daemon --name sensor-listener --respawn --output=daemon.err -- /home/pi/neutrino/hub/sensor-listener -c /etc/sensor-listener.cfg
+
+Stopping the sensor hub:
+
+    $ sudo daemon --name sensor-listener --stop
+
+Running the controller:
+
+    $ cd ~/neutrino/controller
+    $ screen -dmS controller sudo ./controller -c /etc/controller.conf
+
+Running the web UI:
+
+    $ cd ~/neutrino/web
+    $ sudo hypnotoad neutrino-webapp
+
+Stopping the web UI:
+
+    $ sudo hypnotoad neutrino-webapp -stop
